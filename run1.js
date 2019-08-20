@@ -44,6 +44,7 @@ var selected_quiz = -1,
     selected_quiz_output = 0;
 var output_str = '';
 var test_limit_time = 0;
+var selected_line = -1;
 
 /** parsedCodeクラス */
 
@@ -2899,8 +2900,9 @@ var SleepStatement = function (_Statement24) {
 }(Statement);
 
 function highlightLine(l) {
-	$(".codelines").children().removeClass("lineselect");
-	if (l > 0) $(".codelines :nth-child(" + l + ")").addClass("lineselect");
+	selected_line = l;
+	$("#bcralnit_sourceTextarea0").change();
+	$("#sourceTextarea").change();
 }
 
 function reset() {
@@ -3067,6 +3069,7 @@ function editButton(add_code) {
 	}sourceTextArea.value = code1 + add_codes.join("\n") + code2;
 	sourceTextArea.selectionStart = sourceTextArea.selectionEnd = sourceTextArea.value.length - code2.length;
 	sourceTextArea.focus();
+	$("#bcralnit_sourceTextarea0").change();
 }
 
 function keyUp(e) {
@@ -5372,8 +5375,9 @@ onload = function onload() {
 	var file_prefix = document.getElementById("file_prefix");
 	var flowchart_canvas = document.getElementById("flowchart");
 	var resultArea = document.getElementById("resultArea");
-	$("#sourceTextarea").linedtextarea();
+	$("#sourceTextarea").bcralnit();
 	sourceTextArea.onchange = function () {
+		//		$("#bcralnit_sourceTextarea0").change();
 		makeDirty(true);
 	};
 	makeDirty(false);
