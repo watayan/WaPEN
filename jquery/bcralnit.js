@@ -86,9 +86,7 @@ $.fn.bcralnit = function(e) {
             var n = (i + 1);
             var f = a[i];
             var g = f.substring(n.toString().length, f.length);
-            var bg = (n == selected_line) ?  'red' : 'transparent';
-            var fg = (n == selected_line) ? 'white' : e.color;
-            c += '<span style="background:' + bg + ';border:none;box-shadow:none;color:' + fg + '">' 
+            c += '<span style="background:transparent;border:none;box-shadow:none;color:' + e.color + '">' 
                 + ('     ' + n).slice(-6) + '</span>' + g.replace(/\</ig, '~').replace(/\>/ig, '~') + '<br>'
         };
         $('#' + b + ' .bcr_number').html(c);

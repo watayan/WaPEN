@@ -44,7 +44,6 @@ var selected_quiz = -1,
     selected_quiz_output = 0;
 var output_str = '';
 var test_limit_time = 0;
-var selected_line = -1;
 
 /** parsedCodeクラス */
 
@@ -2900,9 +2899,22 @@ var SleepStatement = function (_Statement24) {
 }(Statement);
 
 function highlightLine(l) {
-	selected_line = l;
-	$("#bcralnit_sourceTextarea0").change();
-	$("#sourceTextarea").change();
+	var elem = document.getElementById('bcralnit_sourceTextarea0').firstElementChild;
+	var child = elem.firstElementChild;
+	var line = 1;
+	//	$("#sourceTextarea").focus();
+	while (child) {
+		if (child.tagName == 'SPAN') {
+			if (line++ == l) {
+				child.style.background = 'red';
+				child.style.color = 'white';
+			} else {
+				child.style.background = 'transparent';
+				child.style.color = 'black';
+			}
+		}
+		child = child.nextElementSibling;
+	}
 }
 
 function reset() {
@@ -3069,7 +3081,6 @@ function editButton(add_code) {
 	}sourceTextArea.value = code1 + add_codes.join("\n") + code2;
 	sourceTextArea.selectionStart = sourceTextArea.selectionEnd = sourceTextArea.value.length - code2.length;
 	sourceTextArea.focus();
-	$("#bcralnit_sourceTextarea0").change();
 }
 
 function keyUp(e) {
@@ -3138,6 +3149,7 @@ function sampleButton(num) {
 	sourceTextArea.value = sample[num];
 	reset();
 	if (flowchart) codeChange();
+	$('#sourceTextarea').focus();
 	makeDirty(false);
 }
 
@@ -5377,7 +5389,6 @@ onload = function onload() {
 	var resultArea = document.getElementById("resultArea");
 	$("#sourceTextarea").bcralnit();
 	sourceTextArea.onchange = function () {
-		//		$("#bcralnit_sourceTextarea0").change();
 		makeDirty(true);
 	};
 	makeDirty(false);
