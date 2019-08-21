@@ -36,6 +36,8 @@
   },
   "dependencies": {
     "eslint": "^5.16.0",
-    "npm": "^6.9.0"
+    "jquery": "^3.4.1",
+    "jquery-contextmenu": "^2.8.0",
+    "npm": "^6.11.1"
   }
 }
