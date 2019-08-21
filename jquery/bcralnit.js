@@ -63,7 +63,7 @@ $.fn.bcralnit = function(e) {
         $(this).css('white-space', '-o-pre-wrap');
         $(this).css('word-wrap', 'break-word');
         $(this).addClass("bcr_line");
-        $(this).wrap('<div id="' + c + '" style="float:left;display:inline-block;overflow:hidden;box-sizing:border-box;border:none;background:' + e.background + ';position:relative;padding:0px;margin:' + m + ';width:' + w + ';height:' + h + '"></div>');
+        $(this).wrap('<div id="' + c + '" style="float:left;display:inline-block;overflow:hidden;box-sizing:border-box;border:none;background:' + e.background + ';position:relative;padding:0px;margin:' + m + ';width:' + w + ';height:' + h + ';line-height:' + lh + '"></div>');
         $(this).before(b);
         addln(c, kk);
 
