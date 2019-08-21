@@ -7,10 +7,11 @@
  ***********************************************/
 
 $.fn.bcralnit = function(e) {
+    var selected_line = 10;
     var f = {
         width: '60px',
-        background: '#eee',
-        color: '#000',
+        background: '#ddd',
+        color: '#333',
         addClass: ''
     };
     if (typeof e === 'object') {
@@ -63,17 +64,15 @@ $.fn.bcralnit = function(e) {
         $(this).css('white-space', '-o-pre-wrap');
         $(this).css('word-wrap', 'break-word');
         $(this).addClass("bcr_line");
-        $(this).wrap('<div id="' + c + '" style="float:left;display:inline-block;overflow:hidden;box-sizing:border-box;border:none;background:' + e.background + ';position:relative;padding:0px;margin:' + m + ';width:' + w + ';height:' + h + ';line-height:' + lh + '"></div>');
+        $(this).wrap('<div id="' + c + '" style="display:' + d + ';overflow:hidden;box-sizing:border-box;border:none;background:' + e.background + ';position:relative;padding:0px;margin:' + m + ';width:' + w + ';height:' + h + '"></div>');
         $(this).before(b);
         addln(c, kk);
-
         $(this).on('blur focus change keyup keydown', function() {
 			if(f == 'TEXTAREA'){
 				var vv = $(this).val();
 				addln(c, vv);
 			}
         });
-       $(this).on('blue focus change keyup keydown', $(this).update);
         $(this).scroll(function() {
             $('#' + c + ' .bcr_number').scrollTop($(this).scrollTop())
         })
@@ -86,12 +85,17 @@ $.fn.bcralnit = function(e) {
             var n = (i + 1);
             var f = a[i];
             var g = f.substring(n.toString().length, f.length);
-            c += '<span style="background:transparent;border:none;box-shadow:none;color:' + e.color + '">' 
-                + ('     ' + n).slice(-6) + '</span>' + g.replace(/\</ig, '~').replace(/\>/ig, '~') + '<br>'
+            var selected = e.color
+            if(n == selected_line)selected = 'red';
+            c += '<span style="background:transparent;border:none;box-shadow:none;color:' + selected + '">' + n + '</span>' + g.replace(/\</ig, '~').replace(/\>/ig, '~') + '<br>'
         };
         $('#' + b + ' .bcr_number').html(c);
         $('#' + b + ' .bcr_number').scrollTop($('#' + b + ' .bcr_line').scrollTop());
     }
+    function select_line(n)
+    {
+        selected_line = n;
+        var vv = $(this).val();
+        addln(c, vv);
+    }
 }
-
-
