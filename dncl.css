@@ -114,9 +114,12 @@
 }
 
 .bcr_numbers{
-	line-height: normal;
+	line-height: 18px;
+	font-size: 16px;
 }
 
 #sourceTextarea {
-	line-height: normal;
+	line-height: 18px;
+	font-size: 16px;
+
 }

@@ -7,7 +7,6 @@
  ***********************************************/
 
 $.fn.bcralnit = function(e) {
-    var selected_line = 10;
     var f = {
         width: '60px',
         background: '#ddd',
@@ -82,20 +81,12 @@ $.fn.bcralnit = function(e) {
         var a = vv.split(/\n/),
 			c = '';
         for (i = 0; i < a.length; i++) {
-            var n = (i + 1);
+            var n = ('      ' + (i + 1)).slice(-6);
             var f = a[i];
             var g = f.substring(n.toString().length, f.length);
-            var selected = e.color
-            if(n == selected_line)selected = 'red';
-            c += '<span style="background:transparent;border:none;box-shadow:none;color:' + selected + '">' + n + '</span>' + g.replace(/\</ig, '~').replace(/\>/ig, '~') + '<br>'
+            c += '<span style="background:transparent;border:none;box-shadow:none;color:' + e.color + '">' + n + '</span>' + g.replace(/\</ig, '~').replace(/\>/ig, '~') + '<br>'
         };
         $('#' + b + ' .bcr_number').html(c);
         $('#' + b + ' .bcr_number').scrollTop($('#' + b + ' .bcr_line').scrollTop());
-    }
-    function select_line(n)
-    {
-        selected_line = n;
-        var vv = $(this).val();
-        addln(c, vv);
     }
 }
