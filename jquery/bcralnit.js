@@ -81,7 +81,7 @@ $.fn.bcralnit = function(e) {
         var a = vv.split(/\n/),
 			c = '';
         for (i = 0; i < a.length; i++) {
-            var n = ('      ' + (i + 1)).slice(-6);
+            var n = ((i + 1) + '      ').slice(0, 6);
             var f = a[i];
             var g = f.substring(n.toString().length, f.length);
             c += '<span style="background:transparent;border:none;box-shadow:none;color:' + e.color + '">' + n + '</span>' + g.replace(/\</ig, '~').replace(/\>/ig, '~') + '<br>'

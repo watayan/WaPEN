@@ -44,6 +44,7 @@ var selected_quiz = -1,
     selected_quiz_output = 0;
 var output_str = '';
 var test_limit_time = 0;
+var fontsize = 16;
 
 /** parsedCodeクラス */
 
@@ -5740,4 +5741,18 @@ function auto_marking(i) {
 	document.getElementById('stepButton').disabled = false;
 	document.getElementById('resetButton').disabled = false;
 	setRunflag(false);
+}
+
+function font_size(updown) {
+	if (fontsize + updown < 12 || fontsize + updown > 30) return;
+	fontsize += updown;
+	var elem = document.getElementById('sourceTextarea');
+	elem.style.fontSize = fontsize + 'px';
+	elem.style.lineHeight = fontsize + 2 + 'px';
+	elem = document.getElementById('resultTextarea');
+	elem.style.fontSize = fontsize + 'px';
+	elem.style.lineHeight = fontsize + 2 + 'px';
+	elem = document.getElementsByClassName('bcr_number')[0];
+	elem.style.fontSize = fontsize + 'px';
+	elem.style.lineHeight = fontsize + 2 + 'px';
 }

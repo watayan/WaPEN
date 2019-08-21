@@ -28,6 +28,7 @@ var timeouts = [];
 var selected_quiz = -1, selected_quiz_case = -1, selected_quiz_input = 0, selected_quiz_output = 0;
 var output_str = '';
 var test_limit_time = 0;
+var fontsize = 16;
 
 /** parsedCodeクラス */
 class parsedCode
@@ -4935,3 +4936,17 @@ function auto_marking(i)
 	setRunflag(false);
 }
 
+function font_size(updown)
+{
+	if(fontsize + updown < 12 || fontsize + updown > 30) return;
+	fontsize += updown;
+	var elem = document.getElementById('sourceTextarea');
+	elem.style.fontSize = fontsize + 'px';
+	elem.style.lineHeight = (fontsize + 2) + 'px';
+	elem = document.getElementById('resultTextarea');
+	elem.style.fontSize = fontsize + 'px';
+	elem.style.lineHeight = (fontsize + 2) + 'px';
+	elem = document.getElementsByClassName('bcr_number')[0];
+	elem.style.fontSize = fontsize + 'px';
+	elem.style.lineHeight = (fontsize + 2) + 'px';
+}
