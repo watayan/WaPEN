@@ -2023,6 +2023,24 @@ class InputEnd extends Statement
 	}
 }
 
+class Newline extends Statement
+{
+	constructor(loc){super(loc);}
+	run()
+	{
+		if(selected_quiz < 0)
+		{
+			textareaAppend("\n");
+		}
+		else
+		{
+			output_str += "\n";
+		}
+		super.run();
+	}	
+}
+
+
 class Output extends Statement
 {
 	/**
@@ -2282,7 +2300,7 @@ class ForInc extends Statement
 		let varTable = findVarTable(this.varname.varname);
 		if(setting.var_declaration != 0 && !varTable)
 		{
-			let varTable = varTables[0];
+			varTable = varTables[0];
 			if(this.begin.getValue() instanceof IntValue)varTable.vars[this.varname.varname] = new IntValue(0, this.loc);
 			else if(this.begin.getValue() instanceof FloatValue)varTable.vars[this.varname.varname] = new IntValue(0, this.loc);
 			else varTable = null;
@@ -2334,7 +2352,7 @@ class ForDec extends Statement
 		let varTable = findVarTable(this.varname.varname);
 		if(setting.var_declaration != 0 && !varTable)
 		{
-			let varTable = varTables[0];
+			varTable = varTables[0];
 			if(this.begin.getValue() instanceof IntValue)varTable.vars[this.varname.varname] = new IntValue(0, this.loc);
 			else if(this.begin.getValue() instanceof FloatValue)varTable.vars[this.varname.varname] = new IntValue(0, this.loc);
 			else varTable = null;
@@ -3001,6 +3019,14 @@ class Flowchart
 				parts.next = p1;
 				parts = p1.next = b1;
 			}
+			else if(statement == "Newline")
+			{
+				var p1 = new Parts_Output();
+				var b1 = new Parts_Bar();
+				p1.setValue('改行', true);
+				parts.next = p1;
+				parts = p1.next = b1;
+			}
 			else if(statement == "If")
 			{
 				var p1 = new Parts_If();
@@ -3410,7 +3436,7 @@ class Parts_Output extends Parts
 
 		flowchart.context.fillText(this.text, this.x1 + size * 2 + this.hspace, this.y2 - size);
 
-		if(!this.newline)	// 改行なしマーク
+		if(!this.newline && this.text != '改行')	// 改行なしマーク
 		{
 			var x = this.x2 - this.height / 2;
 			var y = this.y1 + size;
@@ -3446,7 +3472,8 @@ class Parts_Output extends Parts
 	appendCode(code, indent)
 	{
 		code += Parts.makeIndent(indent);
-		code += this.text + " を" + (this.newline ? "" : "改行なしで") + "表示する\n";
+		if(this.text == '改行') code += '改行する\n';
+		else code += this.text + "を" + (this.newline ? "" : "改行なしで") + "表示する\n";
 		if(this.next != null) return this.next.appendCode(code, indent);
 		return code;
 	}

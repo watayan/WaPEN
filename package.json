@@ -14,7 +14,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "babel run.js -o run1.js",
-    "jison": "jison dncl.jison"
+    "jison": "jison dncl.jison; patch < dncl.patch"
   },
   "repository": {
     "type": "git",

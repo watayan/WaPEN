@@ -157,6 +157,7 @@ UNDEFINED		"《"[^》]*"》"
 "円塗描画"				{return 'gFillCircle';}
 "ミリ秒待つ"				{return 'ミリ秒待つ';}
 "変数を確認する"				{return '変数を確認する';}
+"改行する"				{return '改行する';}
 {Identifier}	{return 'IDENTIFIER';}
 <<EOF>>				{return 'EOF';}
 {NEWLINE}				{return 'NEWLINE';}
@@ -328,6 +329,8 @@ PrintStatement
 		{$$ = [new runBeforeGetValue([$1], @1), new Output($1, false, new Location(@1,@2))];}
 	| e 'を表示する' 'NEWLINE' 
 		{$$ = [new runBeforeGetValue([$1], @1), new Output($1, true, new Location(@1,@2))];}
+	| '改行する' 'NEWLINE'
+		{$$ = new Newline(new Location(@1, @1));}
 	;
 
 InputStatement
