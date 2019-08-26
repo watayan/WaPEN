@@ -1,0 +1,58 @@
+*** dncl.js	2019-08-26 08:59:10.229131222 +0900
+--- dncl.js	2019-08-26 09:07:45.850391909 +0900
+***************
+*** 392,400 ****
+                      }
+                  }
+                  if (lexer.showPosition) {
+!                     errStr = 'Parse error on line ' + (yylineno + 1) + ':\n' + lexer.showPosition() + '\nExpecting ' + expected.join(', ') + ', got \'' + (this.terminals_[symbol] || symbol) + '\'';
+                  } else {
+!                     errStr = 'Parse error on line ' + (yylineno + 1) + ': Unexpected ' + (symbol == EOF ? 'end of input' : '\'' + (this.terminals_[symbol] || symbol) + '\'');
+                  }
+                  this.parseError(errStr, {
+                      text: lexer.match,
+--- 392,400 ----
+                      }
+                  }
+                  if (lexer.showPosition) {
+!                     errStr = (yylineno + 1) + '行目に構文エラー:\n' + lexer.showPosition() + '\n\'' + (this.terminals_[symbol] || symbol) + '\'の近く（★のあたり）がおかしい';
+                  } else {
+!                     errStr = (yylineno + 1) + '行目に構文エラー: 予期しなかった' + (symbol == EOF ? 'プログラムの終わり' : '\'' + (this.terminals_[symbol] || symbol) + '\'');
+                  }
+                  this.parseError(errStr, {
+                      text: lexer.match,
+***************
+*** 621,627 ****
+  showPosition:function () {
+          var pre = this.pastInput();
+          var c = new Array(pre.length + 1).join("-");
+!         return pre + this.upcomingInput() + "\n" + c + "^";
+      },
+  
+  // test the lexed token: return FALSE when not a match, otherwise return token
+--- 621,628 ----
+  showPosition:function () {
+          var pre = this.pastInput();
+          var c = new Array(pre.length + 1).join("-");
+! //        return pre + this.upcomingInput() + "\n" + c + "^";
+!         return pre + '★' + this.upcomingInput() + '...\n';
+      },
+  
+  // test the lexed token: return FALSE when not a match, otherwise return token
+***************
+*** 746,752 ****
+          if (this._input === "") {
+              return this.EOF;
+          } else {
+!             return this.parseError('Lexical error on line ' + (this.yylineno + 1) + '. Unrecognized text.\n' + this.showPosition(), {
+                  text: "",
+                  token: null,
+                  line: this.yylineno
+--- 747,753 ----
+          if (this._input === "") {
+              return this.EOF;
+          } else {
+!             return this.parseError((this.yylineno + 1) + '行目にエラー。\n★の近くに不明なテキスト。\n' + this.showPosition(), {
+                  text: "",
+                  token: null,
+                  line: this.yylineno
