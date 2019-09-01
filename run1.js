@@ -1020,13 +1020,13 @@ var Minus = function (_Value14) {
 	function Minus(x, loc) {
 		_classCallCheck(this, Minus);
 
-		return _possibleConstructorReturn(this, (Minus.__proto__ || Object.getPrototypeOf(Minus)).call(this, x, loc));
+		return _possibleConstructorReturn(this, (Minus.__proto__ || Object.getPrototypeOf(Minus)).call(this, [x], loc));
 	}
 
 	_createClass(Minus, [{
 		key: "run",
 		value: function run() {
-			var v1 = this.value.getValue();
+			var v1 = this.value[0].getValue();
 			if (v1 instanceof NullValue) this.rtnv = v1;else if (v1 instanceof IntValue || v1 instanceof FloatValue) {
 				var _v9 = -v1.value;
 				if (_v9 instanceof IntValue && !isSafeInteger(_v9)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
@@ -1038,7 +1038,7 @@ var Minus = function (_Value14) {
 	}, {
 		key: "getCode",
 		value: function getCode() {
-			var v1 = this.value;
+			var v1 = this.value[0];
 			var c1 = constructor_name(v1);
 			var brace1 = false;
 			if (c1 == "Minus" || c1 == "Add" || c1 == "Sub") brace1 = true;
@@ -1131,20 +1131,20 @@ var Not = function (_Value17) {
 	function Not(x, loc) {
 		_classCallCheck(this, Not);
 
-		return _possibleConstructorReturn(this, (Not.__proto__ || Object.getPrototypeOf(Not)).call(this, x, loc));
+		return _possibleConstructorReturn(this, (Not.__proto__ || Object.getPrototypeOf(Not)).call(this, [x], loc));
 	}
 
 	_createClass(Not, [{
 		key: "run",
 		value: function run() {
-			var v1 = this.value.getValue();
+			var v1 = this.value[0].getValue();
 			if (v1 instanceof BooleanValue) this.rtnv = new BooleanValue(!v1.value, this.loc);else throw new RuntimeError(this.first_line, "「でない」は真偽値にしか使えません");
 			code[0].stack[0].index++;
 		}
 	}, {
 		key: "getCode",
 		value: function getCode() {
-			var v1 = this.value;
+			var v1 = this.value[0];
 			var c1 = constructor_name(v1);
 			var brace1 = false;
 			if (c2 == "And" || c2 == "Or" || c2 == "Not") brace2 = true;
@@ -1220,8 +1220,7 @@ var NE = function (_Value19) {
 		value: function run() {
 			var v1 = this.value[0].getValue(),
 			    v2 = this.value[1].getValue();
-			if (v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列を比べることはできません");
-			this.rtnv = new BooleanValue(v1.value != v2.value, this.loc);
+			if (v1 instanceof ArrayValue || v2 instanceof ArrayValue) this.rtnv = new BooleanValue(!ArrayCompare(v1, v2), this.loc);else this.rtnv = new BooleanValue(v1.value != v2.value, this.loc);
 			code[0].stack[0].index++;
 		}
 	}, {
