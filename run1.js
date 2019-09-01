@@ -1147,7 +1147,7 @@ var Not = function (_Value17) {
 			var v1 = this.value[0];
 			var c1 = constructor_name(v1);
 			var brace1 = false;
-			if (c2 == "And" || c2 == "Or" || c2 == "Not") brace2 = true;
+			//		if(c2 == "And" || c2 == "Or" || c2 == "Not") brace2 = true;
 			return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '') + ' でない';
 		}
 	}]);

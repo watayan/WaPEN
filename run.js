@@ -913,7 +913,7 @@ class Not extends Value
 		let v1 = this.value[0];
 		let c1 = constructor_name(v1);
 		let brace1 = false;
-		if(c2 == "And" || c2 == "Or" || c2 == "Not") brace2 = true;
+//		if(c2 == "And" || c2 == "Or" || c2 == "Not") brace2 = true;
 		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
 			+ ' でない';
 	}
