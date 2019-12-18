@@ -407,6 +407,7 @@ class ArrayValue extends Value
 		for(let i = 0; i < l; i++)
 		{
 //			args.value[i].run();
+			if(setting.array_origin == 2 && args.value[i].getValue().value < 1) throw new RuntimeError(loc.first_line, "配列の添字が範囲外です");
 			v = v.nthValue(args.value[i].getValue().value);
 		}
 		return v;
@@ -451,7 +452,7 @@ function makeArray(size, args, loc, type)
 	{
 		let v = [];
 		if(!args) args=[];
-		for(let i = 0; i < size.value[args.length].value + (setting.array_origin == 0 ? 1 : 0); i++)
+		for(let i = 0; i < size.value[args.length].value + (setting.array_origin != 1 ? 1 : 0); i++)
 		{
 			args.push(i);
 			v.push(makeArray(size, args, loc, type));
@@ -1821,6 +1822,7 @@ class Assign extends Statement
 			if(ag) // 配列の添字がある
 				for(let i = 0; i < ag.value.length; i++) 
 				{
+					if(ag.value[i].getValue().value < (setting.array_origin == 2 ? 1 : 0)) throw new RuntimeError(this.first_line,vn + argsString(ag) + "には代入できません");
 					if(va.nthValue(ag.value[i].getValue().value + setting.array_origin == 2 ? 1 : 0))
 						va = va.nthValue(ag.value[i].getValue().value+ setting.array_origin == 2 ? 1 : 0);
 					else
@@ -2079,7 +2081,7 @@ function array2text(v)
 	if(v0 instanceof ArrayValue)
 	{
 		let v1 = [];
-		for(let i = 0; i < v0.value.length; i++) v1.push(array2text(v0.nthValue(i)));
+		for(let i = setting.array_origin == 2 ? 1 : 0; i < v0.value.length; i++) v1.push(array2text(v0.nthValue(i)));
 		return '[' + v1.join(',') + ']';
 	}
 	return v0.value;
@@ -2092,7 +2094,7 @@ function array2code(v)
 	if(v0 instanceof ArrayValue)
 	{
 		let v1 = [];
-		for(let i = 0; i < v0.value.length; i++) v1.push(array2text(v0.nthValue(i)));
+		for(let i = setting.array_origin == 2 ? 1 : 0; i < v0.value.length; i++) v1.push(array2text(v0.nthValue(i)));
 		return '[' + v1.join(',') + ']';
 	}
 	else if(v0 instanceof StringValue) return "「" + v0.value + "」";

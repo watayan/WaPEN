@@ -518,6 +518,7 @@ var ArrayValue = function (_Value2) {
 			var v = this;
 			for (var i = 0; i < l; i++) {
 				//			args.value[i].run();
+				if (setting.array_origin == 2 && args.value[i].getValue().value < 1) throw new RuntimeError(loc.first_line, "配列の添字が範囲外です");
 				v = v.nthValue(args.value[i].getValue().value);
 			}
 			return v;
@@ -575,7 +576,7 @@ function makeArray(size, args, loc, type) {
 	} else {
 		var _v = [];
 		if (!args) args = [];
-		for (var i = 0; i < size.value[args.length].value + (setting.array_origin == 0 ? 1 : 0); i++) {
+		for (var i = 0; i < size.value[args.length].value + (setting.array_origin != 1 ? 1 : 0); i++) {
 			args.push(i);
 			_v.push(makeArray(size, args, loc, type));
 			args.pop();
@@ -2269,6 +2270,7 @@ var Assign = function (_Statement11) {
 					var va = vt.vars[vn];
 					if (ag) // 配列の添字がある
 						for (var _i2 = 0; _i2 < ag.value.length; _i2++) {
+							if (ag.value[_i2].getValue().value < (setting.array_origin == 2 ? 1 : 0)) throw new RuntimeError(this.first_line, vn + argsString(ag) + "には代入できません");
 							if (va.nthValue(ag.value[_i2].getValue().value + setting.array_origin == 2 ? 1 : 0)) va = va.nthValue(ag.value[_i2].getValue().value + setting.array_origin == 2 ? 1 : 0);else {
 								if (setting.var_declaration == 0) throw new RuntimeError(this.first_line, vn + argsString(ag) + "には代入できません");
 								// 配列を延長する
@@ -2505,7 +2507,7 @@ function array2text(v) {
 	var v0 = v.getValue();
 	if (v0 instanceof ArrayValue) {
 		var v1 = [];
-		for (var i = 0; i < v0.value.length; i++) {
+		for (var i = setting.array_origin == 2 ? 1 : 0; i < v0.value.length; i++) {
 			v1.push(array2text(v0.nthValue(i)));
 		}return '[' + v1.join(',') + ']';
 	}
@@ -2517,7 +2519,7 @@ function array2code(v) {
 	var v0 = v.getValue();
 	if (v0 instanceof ArrayValue) {
 		var v1 = [];
-		for (var i = 0; i < v0.value.length; i++) {
+		for (var i = setting.array_origin == 2 ? 1 : 0; i < v0.value.length; i++) {
 			v1.push(array2text(v0.nthValue(i)));
 		}return '[' + v1.join(',') + ']';
 	} else if (v0 instanceof StringValue) return "「" + v0.value + "」";
