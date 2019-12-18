@@ -2269,7 +2269,7 @@ var Assign = function (_Statement11) {
 					var va = vt.vars[vn];
 					if (ag) // 配列の添字がある
 						for (var _i2 = 0; _i2 < ag.value.length; _i2++) {
-							if (va.nthValue(ag.value[_i2].getValue().value)) va = va.nthValue(ag.value[_i2].getValue().value);else {
+							if (va.nthValue(ag.value[_i2].getValue().value + setting.array_origin == 2 ? 1 : 0)) va = va.nthValue(ag.value[_i2].getValue().value + setting.array_origin == 2 ? 1 : 0);else {
 								if (setting.var_declaration == 0) throw new RuntimeError(this.first_line, vn + argsString(ag) + "には代入できません");
 								// 配列を延長する
 								if (_i2 < ag.value.length - 1) va = new ArrayValue([], this.loc);else va = new NullValue(this.loc);

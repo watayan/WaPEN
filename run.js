@@ -1821,8 +1821,8 @@ class Assign extends Statement
 			if(ag) // 配列の添字がある
 				for(let i = 0; i < ag.value.length; i++) 
 				{
-					if(va.nthValue(ag.value[i].getValue().value))
-						va = va.nthValue(ag.value[i].getValue().value);
+					if(va.nthValue(ag.value[i].getValue().value + setting.array_origin == 2 ? 1 : 0))
+						va = va.nthValue(ag.value[i].getValue().value+ setting.array_origin == 2 ? 1 : 0);
 					else
 					{
 						if(setting.var_declaration == 0) throw new RuntimeError(this.first_line, vn + argsString(ag) + "には代入できません");
