@@ -5116,9 +5116,15 @@ var Parts_LoopEnd2 = function (_Parts_LoopEnd) {
 	return Parts_LoopEnd2;
 }(Parts_LoopEnd);
 
-var misc_menu = [
+var misc_menu_ja = [
 //表示            識別子            プログラム上の表現            [引数の意味]
 ["《各種処理》", "none", "《各種処理》", []], ["描画領域開く", "gOpenWindow", "描画領域開く(	,	)", ["幅", "高さ"]], ["描画領域閉じる", "gCloseWindow", "描画領域閉じる()", []], ["描画領域全消去", "gClearWindow", "描画領域全消去()", []], ["線色設定", "gSetLineColor", "線色設定(	,	,	)", ["赤", "青", "緑"]], ["塗色設定", "gSetFillColor", "塗色設定(	,	,	)", ["赤", "青", "緑"]], ["線太さ設定", "gSetLineWidth", "線太さ設定(	)", ["太さ"]], ["文字サイズ設定", "gSetFontSize", "文字サイズ設定(	)", ["サイズ"]], ["文字描画", "gDrawText", "文字描画(	,	,	)", ["文字列", "x", "y"]], ["線描画", "gDrawLine", "線描画(	,	,	,	)", ["x1", "y1", "x2", "y2"]], ["矩形描画", "gDrawBox", "矩形描画(	,	,	,	)", ["x", "y", "幅", "高さ"]], ["矩形塗描画", "gFillBox", "矩形塗描画(	,	,	,	)", ["x", "y", "幅", "高さ"]], ["円描画", "gDrawCircle", "円描画(	,	,	)", ["x", "y", "半径"]], ["円塗描画", "gFillCircle", "円塗描画(	,	,	)", ["x", "y", "半径"]], ["待つ", "sleep", "	 ミリ秒待つ", ["ミリ秒数"]], ["変数を確認する", "dump", "変数を確認する", []]];
+
+var misc_menu_en = [
+//表示            識別子            プログラム上の表現            [引数の意味]
+["《各種処理》", "none", "《各種処理》", []], ["gOpenWindow", "gOpenWindow", "gOpenWindow(	,	)", ["幅", "高さ"]], ["gCloseWindow", "gCloseWindow", "gCloseWindow()", []], ["gClearWindow", "gClearWindow", "gClearWindow()", []], ["gSetLineColor", "gSetLineColor", "gSetLineColor(	,	,	)", ["赤", "青", "緑"]], ["gSetFillColor", "gSetFillColor", "gSetFillColor(	,	,	)", ["赤", "青", "緑"]], ["gSetLineWidth", "gSetLineWidth", "gSetLineWidth(	)", ["太さ"]], ["gSetFontSie", "gSetFontSize", "gSetFontSize(	)", ["サイズ"]], ["gDrawText", "gDrawText", "gDrawText(	,	,	)", ["文字列", "x", "y"]], ["gDrawLine", "gDrawLine", "gDrawLine(	,	,	,	)", ["x1", "y1", "x2", "y2"]], ["gDrawBox", "gDrawBox", "gDrawBox(	,	,	,	)", ["x", "y", "幅", "高さ"]], ["gFillBox", "gFillBox", "gFillBox(	,	,	,	)", ["x", "y", "幅", "高さ"]], ["gDrawCircle", "gDrawCircle", "gDrawCircle(	,	,	)", ["x", "y", "半径"]], ["gFillCircle", "gFillCircle", "gFillCircle(	,	,	)", ["x", "y", "半径"]], ["待つ", "sleep", "	 ミリ秒待つ", ["ミリ秒数"]], ["変数を確認する", "dump", "変数を確認する", []]];
+
+var misc_menu = setting.graphic_command == 0 ? misc_menu_ja : misc_menu_en;
 
 var Parts_Misc = function (_Parts10) {
 	_inherits(Parts_Misc, _Parts10);
@@ -5606,7 +5612,7 @@ onload = function onload() {
 						} }
 				}
 			},
-			misc: { name: "各種命令",
+			graphic1: { name: "グラフィック命令（日本語）",
 				items: {
 					gOpenWindow: { name: "描画領域開く", callback: function callback(k, e) {
 							insertCode("描画領域開く(《幅》,《高さ》)");
@@ -5646,7 +5652,54 @@ onload = function onload() {
 						} },
 					gFillCircle: { name: "円塗描画", callback: function callback(k, e) {
 							insertCode("円塗描画(《x》,《y》,《半径》)");
+						} }
+				}
+			},
+			graphic2: { name: "グラフィック命令（英語）",
+				items: {
+					gOpenWindow: { name: "gOpenWindow", callback: function callback(k, e) {
+							insertCode("gOpenWindow(《幅》,《高さ》)");
 						} },
+					gCloseWindow: { name: "gCloseWindow", callback: function callback(k, e) {
+							insertCode("gCloseWindow()");
+						} },
+					gClearWindow: { name: "gClearWindow", callback: function callback(k, e) {
+							insertCode("gClearWindow()");
+						} },
+					gSetLineColor: { name: "gSetLineColor", callback: function callback(k, e) {
+							insertCode("gSetLineColor(《赤》,《緑》,《青》)");
+						} },
+					gSetFillColor: { name: "gSetFillColor", callback: function callback(k, e) {
+							insertCode("gSetFillColor(《赤》,《緑》,《青》)");
+						} },
+					gSetLineWidth: { name: "gSetLineWidth", callback: function callback(k, e) {
+							insertCode("gSetLineWidth(《太さ》)");
+						} },
+					gSetFontSize: { name: "gSetFontSize", callback: function callback(k, e) {
+							insertCode("gSetFontSize(《サイズ》)");
+						} },
+					gDrawText: { name: "gDrawText", callback: function callback(k, e) {
+							insertCode("gDrawText(《文字列》,《x》,《y》)");
+						} },
+					gDrawLine: { name: "gDrawLine", callback: function callback(k, e) {
+							insertCode("gDrawLine(《x1》,《y1》,《x2》,《y2》)");
+						} },
+					gDrawBox: { name: "gDrawBox", callback: function callback(k, e) {
+							insertCode("gDrawBox(《x》,《y》,《幅》,《高さ》)");
+						} },
+					gFillBox: { name: "gFillBox", callback: function callback(k, e) {
+							insertCode("gFillBox(《x》,《y》,《幅》,《高さ》)");
+						} },
+					gDrawCircle: { name: "gDrawCircle", callback: function callback(k, e) {
+							insertCode("gDrawCircle(《x》,《y》,《半径》)");
+						} },
+					gFillCircle: { name: "gFillCircle", callback: function callback(k, e) {
+							insertCode("gFillCircle(《x》,《y》,《半径》)");
+						} }
+				}
+			},
+			misc: { name: "各種命令",
+				items: {
 					sleep: { name: "待つ", callback: function callback(k, e) {
 							insertCode("《ミリ秒数》 ミリ秒待つ");
 						} },

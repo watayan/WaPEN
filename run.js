@@ -4322,7 +4322,7 @@ class Parts_LoopEnd2 extends Parts_LoopEnd
 	get text2(){return "になるまで";}
 }
 
-var misc_menu =[
+var misc_menu_ja =[
 	//表示            識別子            プログラム上の表現            [引数の意味]
 	["《各種処理》"  , "none"           , "《各種処理》"              ,[]],
 	["描画領域開く"  , "gOpenWindow"    , "描画領域開く(	,	)"       ,["幅","高さ"]],
@@ -4342,6 +4342,27 @@ var misc_menu =[
 	["変数を確認する", "dump"			,"変数を確認する",[]]
 ];
 
+var misc_menu_en =[
+	//表示            識別子            プログラム上の表現            [引数の意味]
+	["《各種処理》"  , "none"           , "《各種処理》"              ,[]],
+	["gOpenWindow"  , "gOpenWindow"    , "gOpenWindow(	,	)"       ,["幅","高さ"]],
+	["gCloseWindow", "gCloseWindow"   , "gCloseWindow()"           ,[]],
+	["gClearWindow", "gClearWindow"   , "gClearWindow()"           ,[]],
+	["gSetLineColor"     , "gSetLineColor"  , "gSetLineColor(	,	,	)"         ,["赤","青","緑"]],
+	["gSetFillColor"     , "gSetFillColor"  , "gSetFillColor(	,	,	)"         ,["赤","青","緑"]],
+	["gSetLineWidth"   , "gSetLineWidth"   , "gSetLineWidth(	)"            ,["太さ"]],
+	["gSetFontSie", "gSetFontSize"   , "gSetFontSize(	)"         ,["サイズ"]],
+	["gDrawText"     , "gDrawText"      , "gDrawText(	,	,	)"        ,["文字列","x","y"]],
+	["gDrawLine"       , "gDrawLine"      , "gDrawLine(	,	,	,	)"        ,["x1","y1","x2","y2"]],
+	["gDrawBox"     , "gDrawBox"       , "gDrawBox(	,	,	,	)"      ,["x","y","幅","高さ"]],
+	["gFillBox"   , "gFillBox"       , "gFillBox(	,	,	,	)"    ,["x","y","幅","高さ"]],
+	["gDrawCircle"      , "gDrawCircle"     , "gDrawCircle(	,	,	)"          ,["x","y","半径"]],
+	["gFillCircle"     , "gFillCircle"    , "gFillCircle(	,	,	)"        ,["x","y","半径"]],
+	["待つ"       , "sleep"           , "	 ミリ秒待つ"                 ,["ミリ秒数"]],
+	["変数を確認する", "dump"			,"変数を確認する",[]]
+];
+
+var misc_menu = setting.graphic_command == 0 ? misc_menu_ja : misc_menu_en;
 
 class Parts_Misc extends Parts
 {
@@ -4816,7 +4837,7 @@ onload = function(){
 						replace:	{name: "replace 置換", callback: function(k,e){insertCode("replace(《文字列》,《位置》,《長さ》,《文字列》)");}},
 					}
 				},
-				misc:{ name:"各種命令",
+				graphic1:{ name:"グラフィック命令（日本語）",
 					items:{
 						gOpenWindow:{name:"描画領域開く", callback: function(k,e){insertCode("描画領域開く(《幅》,《高さ》)");}},
 						gCloseWindow:{name:"描画領域閉じる", callback: function(k,e){insertCode("描画領域閉じる()");}},
@@ -4831,6 +4852,27 @@ onload = function(){
 						gFillBox:{name:"矩形塗描画", callback: function(k,e){insertCode("矩形塗描画(《x》,《y》,《幅》,《高さ》)");}},
 						gDrawCircle:{name:"円描画", callback: function(k,e){insertCode("円描画(《x》,《y》,《半径》)");}},
 						gFillCircle:{name:"円塗描画", callback: function(k,e){insertCode("円塗描画(《x》,《y》,《半径》)");}},
+						},
+					},
+				graphic2:{ name:"グラフィック命令（英語）",
+					items:{
+						gOpenWindow:{name:"gOpenWindow", callback: function(k,e){insertCode("gOpenWindow(《幅》,《高さ》)");}},
+						gCloseWindow:{name:"gCloseWindow", callback: function(k,e){insertCode("gCloseWindow()");}},
+						gClearWindow:{name:"gClearWindow", callback: function(k,e){insertCode("gClearWindow()");}},
+						gSetLineColor:{name:"gSetLineColor", callback: function(k,e){insertCode("gSetLineColor(《赤》,《緑》,《青》)");}},
+						gSetFillColor:{name:"gSetFillColor", callback: function(k,e){insertCode("gSetFillColor(《赤》,《緑》,《青》)");}},
+						gSetLineWidth:{name:"gSetLineWidth", callback: function(k,e){insertCode("gSetLineWidth(《太さ》)");}},
+						gSetFontSize:{name:"gSetFontSize", callback: function(k,e){insertCode("gSetFontSize(《サイズ》)");}},
+						gDrawText:{name:"gDrawText", callback: function(k,e){insertCode("gDrawText(《文字列》,《x》,《y》)");}},
+						gDrawLine:{name:"gDrawLine", callback: function(k,e){insertCode("gDrawLine(《x1》,《y1》,《x2》,《y2》)");}},
+						gDrawBox:{name:"gDrawBox", callback: function(k,e){insertCode("gDrawBox(《x》,《y》,《幅》,《高さ》)");}},
+						gFillBox:{name:"gFillBox", callback: function(k,e){insertCode("gFillBox(《x》,《y》,《幅》,《高さ》)");}},
+						gDrawCircle:{name:"gDrawCircle", callback: function(k,e){insertCode("gDrawCircle(《x》,《y》,《半径》)");}},
+						gFillCircle:{name:"gFillCircle", callback: function(k,e){insertCode("gFillCircle(《x》,《y》,《半径》)");}},
+					},
+				},
+				misc:{name: "各種命令",
+					items:{
 						sleep:{name:"待つ", callback: function(k,e){insertCode("《ミリ秒数》 ミリ秒待つ");}},
 						dump:{name:"変数を確認する", callback: function(k,e){insertCode("変数を確認する");}}
 					}
