@@ -151,11 +151,15 @@ UNDEFINED		"《"[^》]*"》"
 "線色設定"				{return 'gSetLineColor';}
 "gSetLineColor"			{return 'gSetLineColor';}
 "塗色設定"				{return 'gSetFillColor';}
-"gSetFillColor"			{return 'gsetFillColor';}
+"gSetFillColor"			{return 'gSetFillColor';}
+"文字色設定"			{return 'gSetTextColor';}
+"gSetTextColor"			{return 'gSetTextColor';}
 "線太さ設定"			{return 'gSetLineWidth';}
 "gSetLineWidth"			{return 'gSetLineWidth';}
 "文字サイズ設定"		{return 'gSetFontSize';}
 "gSetFontSize"			{return 'gSetFontSize';}
+"点描画"				{return 'gDrawPoint';}
+"gDrawPoint"			{return 'gDrawPoint';}
 "文字描画"				{return 'gDrawText';}
 "gDrawText"				{return 'gDrawText';}
 "線描画"				{return 'gDrawLine';}
@@ -168,6 +172,14 @@ UNDEFINED		"《"[^》]*"》"
 "gDrawCircle"			{return 'gDrawCircle';}
 "円塗描画"				{return 'gFillCircle';}
 "gFillCircle"			{return 'gFillCircle';}
+"楕円描画"				{return 'gDrawOval';}
+"gDrawOval"				{return 'gDrawOval';}
+"楕円塗描画"			{return 'gFillOval';}
+"gFillOval"				{return 'gFillOval';}
+"弧描画"				{return 'gDrawArc';}
+"gDrawArc"				{return 'gDrawArc';}
+"弧塗描画"				{return 'gFillArc';}
+"gFillArc"				{return 'gFillArc';}
 "ミリ秒待つ"			{return 'ミリ秒待つ';}
 "変数を確認する"		{return '変数を確認する';}
 "改行する"				{return '改行する';}
@@ -378,6 +390,18 @@ GraphicStatement
 		{$$ = [new runBeforeGetValue([$3,$5,$7], @1), new GraphicStatement('gDrawCircle', [$3,$5,$7], new Location(@1,@1))];}
 	| 'gFillCircle' '(' e 'COMMA' e 'COMMA' e ')' 'NEWLINE'
 		{$$ = [new runBeforeGetValue([$3,$5,$7], @1), new GraphicStatement('gFillCircle', [$3,$5,$7], new Location(@1,@1))];}
+	| 'gSetTextColor' '(' e 'COMMA' 'e' 'COMMA' 'e' ')' 'NEWLINE'
+		{$$ = [new runBeforeGetValue([$3,$5,$7], @1), new GraphicStatement('gSetTextColor', [$3,$5,$7], new Location(@1,@1))];}
+	| 'gDrawPoint' '(' e 'COMMA' e ')' 'NEWLINE'
+		{$$ = [new runBeforeGetValue([$3,$5], @1), new GraphicStatement('gDrawPoint', [$3,$5], new Location(@1,@1))];}
+	| 'gDrawOval' '(' e 'COMMA' e 'COMMA' e 'COMMA' e ')' 'NEWLINE' 
+		{$$ = [new runBeforeGetValue([$3,$5,$7,$9], @1), new GraphicStatement('gDrawOval', [$3,$5,$7,$9], new Location(@1,@1))];}
+	| 'gFillOval' '(' e 'COMMA' e 'COMMA' e 'COMMA' e ')' 'NEWLINE' 
+		{$$ = [new runBeforeGetValue([$3,$5,$7,$9], @1), new GraphicStatement('gFillOval', [$3,$5,$7,$9], new Location(@1,@1))];}
+	| 'gDrawArc' '(' e 'COMMA' e 'COMMA' e 'COMMA' e 'COMMA' e 'COMMA' e 'COMMA' e ')' 'NEWLINE'
+		{$$ = [new runBeforeGetValue([$3,$5,$7,$9,$11,$13,$15], @1), new GraphicStatement('gDrawArc', [$3,$5,$7,$9,$11,$13,$15], new Location(@1,@1))];}
+	| 'gFillArc' '(' e 'COMMA' e 'COMMA' e 'COMMA' e 'COMMA' e 'COMMA' e 'COMMA' e ')' 'NEWLINE' 
+		{$$ = [new runBeforeGetValue([$3,$5,$7,$9,$11,$13,$15], @1), new GraphicStatement('gFillArc', [$3,$5,$7,$9,$11,$13,$15], new Location(@1,@1))];}
 	;
 
 SleepStatement
