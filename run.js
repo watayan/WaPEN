@@ -2119,6 +2119,10 @@ class GraphicStatement extends Statement
 			canvas.setAttribute("width", this.args[0].getValue().value + "px");
 			canvas.setAttribute("height", this.args[1].getValue().value + "px");
 			canvas.style.display="block";
+			context.fillStyle = "rgba(255,255,255,1)";
+			context.fillRect(0, 0, canvas.width, canvas.height);
+			context.strokeStyle = "rgba(0,0,0,1)";
+			context.fillStyle = "rgba(0,0,0,1)";
 		}
 		else if(this.command == 'gCloseWindow')
 		{
@@ -2129,25 +2133,28 @@ class GraphicStatement extends Statement
 		else if(this.command == 'gClearWindow')
 		{
 			var canvas = document.getElementById('canvas');
-			context.clearRect(0,0,canvas.width, canvas.height)
+			context.fillStyle = "rgba(255,255,255,1)";
+			context.fillRect(0, 0, canvas.width, canvas.height);
+			context.strokeStyle = "rgba(0,0,0,1)";
+			context.fillStyle = "rgba(0,0,0,1)";
 		}
 		else if(this.command == 'gSetLineColor')
 		{
 			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 			let r = this.args[0].getValue().value, g = this.args[1].getValue().value, b = this.args[2].getValue().value;
-			context.strokeStyle = "rgb(" + r + "," + g + "," + b + ")";
+			context.strokeStyle = "rgba(" + r + "," + g + "," + b + ",1)";
 		}
 		else if(this.command == 'gSetFillColor')
 		{
 			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 			let r = this.args[0].getValue().value, g = this.args[1].getValue().value, b = this.args[2].getValue().value;
-			context.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+			context.fillStyle = "rgba(" + r + "," + g + "," + b + ",1)";
 		}
 		else if(this.command == 'gSetTextColor')
 		{
 			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 			let r = this.args[0].getValue().value, g = this.args[1].getValue().value, b = this.args[2].getValue().value;
-			context.textStyle = "rgb(" + r + "," + g + "," + b + ")";	// ?
+			context.textStyle = "rgba(" + r + "," + g + "," + b + ",1)";	// ?
 		}
 		else if(this.command == 'gSetLineWidth')
 		{
@@ -2171,12 +2178,9 @@ class GraphicStatement extends Statement
 		{
 			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 			let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value;
-			var temp = context.lineWidth;
-			context.lineWidth = 0.4;
 			context.beginPath();
-			context.rect(x1 - 0.5, y1 - 0.5, 0.2, 0.2);
+			context.arc(x1, y1, 1, 0, Math.PI * 2, false);
 			context.stroke();
-			context.lineWidth = temp;
 		}
 		else if(this.command == 'gDrawLine')
 		{
@@ -2205,7 +2209,7 @@ class GraphicStatement extends Statement
 			context.fillRect(x1, y1, width, height);
 			context.beginPath();
 			context.strokeRect(x1, y1, width, height);
-			context.stroke();
+			context.fill();
 		}
 		else if(this.command == 'gDrawCircle')
 		{

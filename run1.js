@@ -2549,31 +2549,38 @@ var GraphicStatement = function (_Statement17) {
 				canvas.setAttribute("width", this.args[0].getValue().value + "px");
 				canvas.setAttribute("height", this.args[1].getValue().value + "px");
 				canvas.style.display = "block";
+				context.fillStyle = "rgba(255,255,255,1)";
+				context.fillRect(0, 0, canvas.width, canvas.height);
+				context.strokeStyle = "rgba(0,0,0,1)";
+				context.fillStyle = "rgba(0,0,0,1)";
 			} else if (this.command == 'gCloseWindow') {
 				var canvas = document.getElementById('canvas');
 				canvas.style.display = "none";
 				context = null;
 			} else if (this.command == 'gClearWindow') {
 				var canvas = document.getElementById('canvas');
-				context.clearRect(0, 0, canvas.width, canvas.height);
+				context.fillStyle = "rgba(255,255,255,1)";
+				context.fillRect(0, 0, canvas.width, canvas.height);
+				context.strokeStyle = "rgba(0,0,0,1)";
+				context.fillStyle = "rgba(0,0,0,1)";
 			} else if (this.command == 'gSetLineColor') {
 				if (context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 				var r = this.args[0].getValue().value,
 				    g = this.args[1].getValue().value,
 				    b = this.args[2].getValue().value;
-				context.strokeStyle = "rgb(" + r + "," + g + "," + b + ")";
+				context.strokeStyle = "rgba(" + r + "," + g + "," + b + ",1)";
 			} else if (this.command == 'gSetFillColor') {
 				if (context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 				var _r = this.args[0].getValue().value,
 				    _g = this.args[1].getValue().value,
 				    _b = this.args[2].getValue().value;
-				context.fillStyle = "rgb(" + _r + "," + _g + "," + _b + ")";
+				context.fillStyle = "rgba(" + _r + "," + _g + "," + _b + ",1)";
 			} else if (this.command == 'gSetTextColor') {
 				if (context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 				var _r2 = this.args[0].getValue().value,
 				    _g2 = this.args[1].getValue().value,
 				    _b2 = this.args[2].getValue().value;
-				context.textStyle = "rgb(" + _r2 + "," + _g2 + "," + _b2 + ")"; // ?
+				context.textStyle = "rgba(" + _r2 + "," + _g2 + "," + _b2 + ",1)"; // ?
 			} else if (this.command == 'gSetLineWidth') {
 				if (context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 				context.lineWidth = this.args[0].getValue().value;
@@ -2590,12 +2597,9 @@ var GraphicStatement = function (_Statement17) {
 				if (context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 				var x1 = this.args[0].getValue().value,
 				    y1 = this.args[1].getValue().value;
-				var temp = context.lineWidth;
-				context.lineWidth = 0.4;
 				context.beginPath();
-				context.rect(x1 - 0.5, y1 - 0.5, 0.2, 0.2);
+				context.arc(x1, y1, 1, 0, Math.PI * 2, false);
 				context.stroke();
-				context.lineWidth = temp;
 			} else if (this.command == 'gDrawLine') {
 				if (context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 				var _x = this.args[0].getValue().value,
@@ -2624,7 +2628,7 @@ var GraphicStatement = function (_Statement17) {
 				context.fillRect(_x3, _y3, _width, _height);
 				context.beginPath();
 				context.strokeRect(_x3, _y3, _width, _height);
-				context.stroke();
+				context.fill();
 			} else if (this.command == 'gDrawCircle') {
 				if (context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
 				var _x4 = this.args[0].getValue().value,
