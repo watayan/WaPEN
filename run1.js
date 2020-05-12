@@ -5733,6 +5733,9 @@ onload = function onload() {
 					gDrawText: { name: "文字描画", callback: function callback(k, e) {
 							insertCode("文字描画(《文字列》,《x》,《y》)");
 						} },
+					gDrawPoint: { name: "線描画", callback: function callback(k, e) {
+							insertCode("点描画(《x》,《y》)");
+						} },
 					gDrawLine: { name: "線描画", callback: function callback(k, e) {
 							insertCode("線描画(《x1》,《y1》,《x2》,《y2》)");
 						} },
@@ -5790,6 +5793,9 @@ onload = function onload() {
 						} },
 					gDrawText: { name: "gDrawText", callback: function callback(k, e) {
 							insertCode("gDrawText(《文字列》,《x》,《y》)");
+						} },
+					gDrawPoint: { name: "gDrawLine", callback: function callback(k, e) {
+							insertCode("gDrawPoint(《x》,《y》)");
 						} },
 					gDrawLine: { name: "gDrawLine", callback: function callback(k, e) {
 							insertCode("gDrawLine(《x1》,《y1》,《x2》,《y2》)");
