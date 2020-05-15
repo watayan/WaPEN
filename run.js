@@ -2255,7 +2255,7 @@ class GraphicStatement extends Statement
 			let x = this.args[0].getValue().value, y = this.args[1].getValue().value, w = this.args[2].getValue().value, h = this.args[3].getValue().value,
 				theta1 = this.args[4].getValue().value, theta2 = this.args[5].getValue().value, type = this.args[6].getValue().value;
 			context.beginPath();
-			context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, theta1 * Math.PI / 180,  -theta2 * Math.PI / 180, true);
+			context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, -theta1 * Math.PI / 180,  -theta2 * Math.PI / 180, true);
 			if(type == 2)	// 半径
 			{
 				context.lineTo(x + w / 2, y + h / 2);
@@ -2275,7 +2275,7 @@ class GraphicStatement extends Statement
 			for(var i = 0; i < 2; i++)
 			{
 				context.beginPath();
-				context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, theta1 * Math.PI / 180,  -theta2 * Math.PI / 180, true);
+				context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, -theta1 * Math.PI / 180,  -theta2 * Math.PI / 180, true);
 				if(type == 2)	// 半径
 				{
 					context.lineTo(x + w / 2, y + h / 2);

@@ -2679,7 +2679,7 @@ var GraphicStatement = function (_Statement17) {
 				    theta2 = this.args[5].getValue().value,
 				    type = this.args[6].getValue().value;
 				context.beginPath();
-				context.ellipse(_x7 + _w2 / 2, _y7 + _h2 / 2, _w2 / 2, _h2 / 2, 0, theta1 * Math.PI / 180, -theta2 * Math.PI / 180, true);
+				context.ellipse(_x7 + _w2 / 2, _y7 + _h2 / 2, _w2 / 2, _h2 / 2, 0, -theta1 * Math.PI / 180, -theta2 * Math.PI / 180, true);
 				if (type == 2) // 半径
 					{
 						context.lineTo(_x7 + _w2 / 2, _y7 + _h2 / 2);
@@ -2700,7 +2700,7 @@ var GraphicStatement = function (_Statement17) {
 				    _type = this.args[6].getValue().value;
 				for (var i = 0; i < 2; i++) {
 					context.beginPath();
-					context.ellipse(_x8 + _w3 / 2, _y8 + _h3 / 2, _w3 / 2, _h3 / 2, 0, _theta * Math.PI / 180, -_theta2 * Math.PI / 180, true);
+					context.ellipse(_x8 + _w3 / 2, _y8 + _h3 / 2, _w3 / 2, _h3 / 2, 0, -_theta * Math.PI / 180, -_theta2 * Math.PI / 180, true);
 					if (_type == 2) // 半径
 						{
 							context.lineTo(_x8 + _w3 / 2, _y8 + _h3 / 2);
