@@ -11,11 +11,16 @@ const typeOfValue=
 	typeArray:5
 };
 
+var graphColor = [
+	'#c00000','#00c000','#0000c0','#007070','#700070','#707000'
+];
+
+const nameOfType=['','整数','実数','文字列','真偽','配列'];
+
 var code = null;		// コードを積む（関数・手続き単位で）
 var varTables = [];		// 変数テーブルを積む
 var myFuncs = {};		// プログラム中で定義される関数・手続き
-var returnValues = [];	// 関数からの返り値を積む
-var run_flag = false, step_flag = false;
+var run_flag = false, step_flag = false, editable_flag = true;
 var flowchart = null;
 var textarea = null;
 var context = null;
@@ -29,6 +34,7 @@ var selected_quiz = -1, selected_quiz_case = -1, selected_quiz_input = 0, select
 var output_str = '';
 var test_limit_time = 0;
 var fontsize = 16;
+var editor = null;
 
 /** parsedCodeクラス */
 class parsedCode
@@ -37,7 +43,7 @@ class parsedCode
 	 * @constructor
 	 * @param {Array<Statement>} statementlist 
 	 */
-	constructor(statementlist){this.stack = [{statementlist:statementlist, index: 0}]}
+	 constructor(statementlist){this.stack = [{statementlist:statementlist, index: 0}]}
 }
 
 /** parsedMainRoutineクラス
@@ -50,17 +56,6 @@ class parsedMainRoutine extends parsedCode
 	 * @param {Array<Statement>} statementlist 
 	 */
 	constructor(statementlist){super(statementlist);}
-	/**
-	 * プログラムの実行が終了したときの処理
-	 */
-	finish()
-	{
-		if(selected_quiz < 0) textareaAppend("---\n");
-		highlightLine(-1);
-		setRunflag(false);
-		wait_time = 0;
-		code = null;
-	}
 }
 
 /** parsedFunctionクラス
@@ -103,18 +98,9 @@ class varTable
 		this.vars = {};
 	}
 	/**
-	 * 変数名が変数テーブルにあるか(関数 findVarTableからしか呼んではならない)
-	 * @param {string} varname 
-	 * @returns {varTable} 自分がvarnameを持てば自分自身を返す
-	 */
-	findVarTable(varname)
-	{
-		if(this.vars[varname]) return this;
-		else return null;
-	}
-	/**
 	 * 
 	 * @param {Array<string>} oldvars 
+	 * @retuns {Array} 持っている変数名をnamesに追加してソートしたもの
 	 */
 	varnames(oldvars)
 	{
@@ -123,6 +109,17 @@ class varTable
 			if(names.indexOf(name) < 0) names.push(name);
 		return names.sort();
 	}
+	/**
+	* 変数名が変数テーブルにあるか(関数 findVarTableからしか呼んではならない)
+	* @param {string} varname 
+	* @returns {varTable} 自分がvarnameを持てば自分自身を返す
+	*/
+	findVarTable(varname)
+	{
+			if(this.vars[varname]) return this;
+			else return null;
+	}
+	
 }
 
 /**
@@ -163,8 +160,10 @@ function codeChange()
 	}
 	catch(e)
 	{
-		console.log(e);
-		textarea.value = `構文エラーです\n${e.message}\n`;
+		highlightLine(-1);
+		textareaClear();
+		if(e.line) textareaAppend(e.line + "行目");
+		textareaAppend('構文エラーです\n' + e.message);;
 		converting = false;
 	}
 }
@@ -178,8 +177,7 @@ function codeChange()
  */
 function isFinite(v)
 {
-	return !isNaN(v) && v != Number.POSITIVE_INFINITY && v != Number.NEGATIVE_INFINITY;
-	// return Number.isFinite(v);
+	return Number.isFinite(v);
 }
 
 /**
@@ -189,8 +187,7 @@ function isFinite(v)
  */
 function isSafeInteger(v)
 {
-	return !isNaN(v) && v == Math.floor(v) && v <= 9007199254740991 && v >= -9007199254740991;
-	// return Number.isSafeInteger(v);
+	return Number.isSafeInteger(v);
 }
 
 /**
@@ -200,8 +197,7 @@ function isSafeInteger(v)
  */
 function isInteger(v)
 {
-	return isFinite(v) && v == Math.floor(v);
-	// return Number.isInteger(v);
+	return Number.isInteger(v);
 }
 
 /**
@@ -211,9 +207,9 @@ function isInteger(v)
  */
 function constructor_name(obj)
 {
-	var result = /^(class|function)\s+([\w\d]+)/.exec(obj.constructor.toString());
-	return result ? result[2] : null;
-	// return obj.constructor.name;
+	// var result = /^(class|function)\s+([\w\d]+)/.exec(obj.constructor.toString());
+	// return result ? result[2] : null;
+	return obj.constructor.name;
 }
 
 /**
@@ -305,46 +301,52 @@ class RuntimeError
 /**
  * 値クラスの親クラス
  */
-class Value
-{
-	/**
-	 * @constructor
-	 * @param {number|string|boolean} v 
-	 * @param {Location} loc 
-	 */
-	constructor(v, loc)
-	{
-		this._value = v;
-		this._loc = loc;
-		this.rtnv = v;
-	}
-	/**
-	 * @returns 生のJavaScriptにおける値
-	 */
-	get value() {return this._value;}
-	get loc() {return this._loc;}
-	get first_line() {return this._loc.first_line;}
-	/**
-	 * @returns {Value} 値
-	 */
-	getValue()
-	{
-		return this.rtnv;
-	}
-	/**
-	 * @returns {string} DNCLの文法で表した文字列
-	 */
-	getCode()
-	{
-		return '' + this._value;
-	}
-	run()
-	{
-//		this.rtnv = this;
-		code[0].stack[0].index++;
-	}
-}
-
+ class Value
+ {
+	 /**
+	  * @constructor
+	  * @param {number|string|boolean} v 
+	  * @param {Location} loc 
+	  */
+	 constructor(v, loc)
+	 {
+		 this._value = v;
+		 this.rtnv = null;
+		 this._loc = loc;
+	 }
+	 clone()
+	 {
+		 throw new RuntimeError(this.first_line, constructor_name(this) + "はcloneが作られていません");
+	 }
+	 /**
+	  * @returns 生のJavaScriptにおける値
+	  */
+	 get value() {return this._value;}
+	 get loc() {return this._loc;}
+	 get first_line() {return this._loc.first_line;}
+	 /**
+	  * @returns {Value} 値
+	  */
+	 getValue()
+	 {
+		 return this;
+	 }
+	 /**
+	  * @returns {string} PyPENの文法で表した文字列
+	  */
+	 getCode()
+	 {
+		 return '' + this._value;
+	 }
+	 /**
+	  * @returns {string} Pythonの文法で表した文字列
+	  */
+	 run()
+	 {
+		 code[0].stack[0].index++;
+	 }
+ }
+ 
 /**
  * 型の決まってない値
  * @extends Value
@@ -359,11 +361,210 @@ class NullValue extends Value
 	{
 		super(0, loc);
 	}
-	getValue()
+	clone()
 	{
-		return this;
+		return new NullValue(this.loc);
 	}
 }
+
+/**
+ * vtにあるvn[args]にnewvalをセットする
+ * @param {VarTable} vt 
+ * @param {String} vn 
+ * @param {Array<Value>} args 
+ * @param {Value} newval 
+ * @param {Location} loc 
+ */
+ function setVariableByArgs(vt,vn, args, newval, loc)
+ {
+	 if(args)
+	 {
+		 var v = vt.vars[vn];
+		 for(var i = 0; i < args.length - 1; i++)
+		 {
+			 var arg = args[i];
+			 if(arg.getValue() instanceof IntValue)
+			 {
+				 if(v.getValue() instanceof ArrayValue || v.getValue() instanceof StringValue)
+				 {
+					 var idx = arg.getValue().value;
+					 var l = v.getValue().length;
+					 if(idx < 0) idx += l;
+					 if(idx >= 0 && idx < l) v = v.getValue().value[idx];
+					 else throw new RuntimeError(loc.first_line, "配列の範囲を超えて代入しようとしました");
+				 }
+				 else if(v.getValue() instanceof StringValue)
+					 throw new RuntimeError(loc.first_line, "部分文字列の部分文字列への代入はできません");
+				 else throw new RuntimeError(loc.first_line, "整数の添字は配列か文字列でないと使えません");
+			 }
+			 else if(arg.getValue() instanceof StringValue)
+			 {
+				 var key0 = arg.getValue().value;
+				 if(v.getValue() instanceof DictionaryValue)
+				 {
+					 for(var key in v.getValue().value)
+					 {
+						 if(key == key0)
+						 {
+							 v = v.getValue().value[key0];
+							 key0 = null;
+							 break;
+						 }
+					 }
+					 if(key0) throw new RuntimeError(loc.first_line, "辞書にキー"+arg.getValue().value+"がありません");
+				 } 
+				 else throw new RuntimeError(loc.first_line, "文字列の添字は辞書でないと使えません");
+			 }
+			 else if(arg.getValue() instanceof SliceValue)
+				 throw new RuntimeError(loc.first_line, "スライスの使い方が正しくありません");
+			 else throw new RuntimeError(loc.first_line, "添字が正しくありません");
+		 }
+		 //代入
+		 var arg = args[args.length - 1];
+		 if(arg.getValue() instanceof IntValue)
+		 {
+			 var idx = arg.getValue().value;
+			 var l = v.getValue().value.length;
+			 if(idx < 0) idx += l;
+			 if(idx < 0 || idx >= l) throw new RuntimeError(loc.first_line, "配列の範囲を超えて代入しようとしました");
+			 if(v.getValue() instanceof ArrayValue) v.getValue().value[idx] = newval.clone();
+			 else if(v.getValue() instanceof StringValue)
+			 {
+				 if(!(newval.getValue() instanceof StringValue)) throw new RuntimeError(loc.first_line, "文字列の途中に文字列でないものを挿入しようとしました");
+				 var str = v.getValue().value;
+				 v.getValue()._value = str.substr(0, idx) + newval.getValue()._value + str.substr(idx + 1);
+			 }
+			 else throw new RuntimeError(loc.first_line, "整数の添字は配列か文字列にしか使えません");
+		 }
+		 else if(arg.getValue() instanceof StringValue)
+		 {
+			 if(v.getValue() instanceof DictionaryValue) v.getValue().value[arg.getValue().value] = newval.clone();
+			 else throw new RuntimeError(loc.first_line, "文字列の添字は辞書にしか使えません");
+		 }
+		 else if(arg.getValue() instanceof SliceValue)
+		 {
+			 var idx1 = arg.getValue1().getValue().value;
+			 var idx2 = arg.getValue2().getValue().value;
+			 if(v.getValue() instanceof ArrayValue)
+			 {
+				 if(!(newval.getValue() instanceof ArrayValue)) throw new RuntimeError(loc.first_line, "配列に配列でないものを挿入しようとしました");
+				 var l = v.getValue().length;
+				 if(!idx1) idx1 = 0;
+				 if(!idx2) idx2 = l;
+				 if(idx1 < 0) idx1 += l;
+				 if(idx2 < 0) idx2 += l;
+				 if(idx1 >= 0 && idx2 >= 0 && idx1 < l && idx2 < l)
+				 {
+					 var a = [];
+					 for(var i = 0; i < idx1; i++) a.push(v.getValue().value[i].clone());
+					 for(var i = 0; i < newval.getValue().length; i++) a.push(newval.getValue().value[i].clone());
+					 for(var i = idx2; i <  l; i++) a.push(v.getValue().value[i].clone());
+					 v.getValue()._value = a;
+				 }
+				 else throw new RuntimeError(loc.first_line, "配列の範囲外に挿入しようとしました");
+			 }
+			 else if(v.getValue() instanceof StringValue)
+			 {
+				 if(!(newval.getValue() instanceof StringValue)) throw new RuntimeError(loc.first_line, "文字列の途中に文字列でないものを挿入しようとしました");
+				 var l = v.getValue().length;
+				 if(!idx1) idx1 = 0;
+				 if(!idx2) idx2 = l;
+				 if(idx1 < 0) idx1 += l;
+				 if(idx2 < 0) idx2 += l;
+				 if(idx1 >= 0 && idx2 >= 0 && idx1 < l && idx2 < l) 
+				 {
+					 var str = v.getValue().value.substr(0, idx1) + newval.getValue().value + v.getValue().value.substr(idx2);
+					 v.getValue()._value = str;
+				 }
+			 }
+			 else throw new RuntimeError("スライスの添字は配列か文字列でないと使えません");
+		 }
+		 else throw new RuntimeError(loc.first_line, "添字が正しくありません");
+ 
+	 }
+	 else
+	 {
+		 vt.vars[vn] = newval.clone();
+		 return;
+	 }
+ }
+ 
+ /**
+  * v[args]の値を取得する
+  * @param {Variable} v 
+  * @param {Array<Value>} args 
+  * @param {Location} loc 
+  * @returns Value
+  */
+ function getValueByArgs(v, args, loc)
+ {
+	 if(args)
+	 {
+		 for(var i = 0; i < args.length; i++)
+		 {
+			 var arg = args[i];
+			 if(arg.getValue() instanceof IntValue)
+			 {
+				 if(v.getValue() instanceof ArrayValue)	// 配列のidx番目
+				 {
+					 var idx = arg.getValue().value;
+					 var l = v.length;
+					 if(idx < 0) idx += l;
+					 if(idx >= 0 && idx < l) v = v.getValue().value[idx];
+					 else throw new RuntimeError(loc.first_line, "配列の範囲を超えてアクセスしました");
+				 }
+				 else if(v.getValue() instanceof StringValue)	// 文字列のidx文字目
+				 {
+					 var idx = arg.getValue().value;
+					 var l = v.getValue().length;
+					 if(idx < 0) idx += l;
+					 if(idx >= 0 && idx < l) v = new StringValue(v.getValue().value[idx], loc);
+					 else throw new RuntimeError(loc.first_line, "文字列の範囲を超えてアクセスしました");
+				 }
+				 else throw new RuntimeError(loc.first_line, "整数の添字は配列か文字列でないと使えません");
+			 }
+			 else if(arg.getValue() instanceof StringValue)
+			 {
+				 if(v.getValue() instanceof DictionaryValue) v = v.getValue().value[arg.getValue().value];
+				 else throw new RuntimeError(loc.first_line, "文字列の添字は辞書でないと使えません");
+			 }
+			 else if(arg.getValue() instanceof SliceValue)
+			 {
+				 var idx1 = arg.getValue1().getValue().value;
+				 var idx2 = arg.getValue2().getValue().value;
+				 if(v.getValue() instanceof ArrayValue)	// 配列のスライス
+				 {
+					 var l = v.getValue().length;
+					 if(!idx1) idx1 = 0;
+					 if(!idx2) idx2 = l;
+					 if(idx1 < 0) idx1 += l;
+					 if(idx2 < 0) idx2 += l;
+					 if(idx1 >= 0 && idx2 >= 0 && idx1 <= l && idx2 <= l)
+					 {
+						 var a = [];
+						 for(var j = idx1; j < idx2; j++) a.push(v.getValue().value[j].clone());
+						 v = new ArrayValue(a, loc);
+					 }
+					 else throw new RuntimeError(loc.first_line, "配列の範囲を超えて読み出そうとしました");
+				 }
+				 else if(v.getValue() instanceof StringValue)	// 文字列のスライス
+				 {
+					 var l = v.getValue().length;
+					 if(!idx1) idx1 = 0;
+					 if(!idx2) idx2 = l;
+					 if(idx1 < 0) idx1 += l;
+					 if(idx2 < 0) idx2 += l;
+					 if(idx1 >= 0 && idx2 >= 0 && idx1 <= l && idx2 <= l) v = new StringValue(v.getValue().value.substr(idx1, idx2 - idx1), loc);
+					 else throw new RuntimeError(loc.first_line, "文字列の範囲を超えて読み出そうとしました");
+				 }
+				 else throw new RuntimeError(loc.first_line, "スライスの添字は配列か文字列でないと使えません");
+			 }
+			 else throw new RuntimeError(loc.first_line, "添字が正しくありません");
+		 }
+	 }
+	 return v.clone();
+ }
+ 
 
 /**
  * 値の配列
@@ -372,12 +573,42 @@ class ArrayValue extends Value
 {
 	/**
 	 * @constructor
-	 * @param {Array} v 
+	 * @param {Array<Value>} v 
 	 * @param {Location} loc 
 	 */
 	constructor(v, loc)
 	{
 		super(v, loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var a = [];
+		for(var i = 0; i < this.value.length; i++) a.push(this.value[i].clone());
+		var rtnv = new ArrayValue(a, this.loc);
+		rtnv.rtnv = rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			var a = [];
+			for(var i = 0; i < this.value.length; i++) 
+			{
+				a.push(this.value[i].getValue());
+			}
+			this.rtnv = new ArrayValue(a, this.loc);
+			this.rtnv.rtnv = this.rtnv;
+			this.state = 0;
+		}
 	}
 	getCode()
 	{
@@ -385,82 +616,92 @@ class ArrayValue extends Value
 		for(var i = 0; i < this.value.length; i++) ag.push(this.value[i].getCode());
 		return '[' + ag.join(',') + ']';
 	}
-	get length() {return this._value.length;}
-	nthValue(idx){return this._value[idx];}
-	setValueToArray(args, va)
-	{
-		let l = args ? args.value.length : 0;
-		let v = this;
-		for(let i = 0; i < l - 1; i++)
-		{
-			if(v.nthValue(args.value[i].getValue().value))
-				v = v.nthValue(args.value[i].getValue().value);
-			else
-				v = v._value[args.value[i].getValue().value] = new ArrayValue([],this.loc);
-		}
-		v._value[args.value[l - 1].getValue().value] = va;
-	}
-	getValueFromArray(args, loc)
-	{
-		let l = args ? args.value.length : 0;
-		let v = this;
-		for(let i = 0; i < l; i++)
-		{
-//			args.value[i].run();
-			if(setting.array_origin == 2 && args.value[i].getValue().value < 1) throw new RuntimeError(loc.first_line, "配列の添字が範囲外です");
-			v = v.nthValue(args.value[i].getValue().value);
-		}
-		return v;
-	}
-	/**
-	 * 同じ値を持つArrayValueを作る
-	 * @returns {ArrayValue}
-	 */
-	clone()
-	{
-		let rtnv = [];
-		for(let i = 0; i < this.length; i++) rtnv.push(this.value[i].clone());
-		return new ArrayValue(rtnv, this.loc);
-	}
+	get length() {return this.value.length;}
 	getValue()
 	{
-		return this;
+		return this.rtnv;
+	}
+	append(a)
+	{
+		for(var i of a) this._value.push(i);
 	}
 }
 
 /**
- * JavaScriptのArrayからArrayValueを作る
- * @param {*} size 
- * @param {*} args 
- * @param {Location} loc 
- * @param {typeOfValue} type 
+ * 辞書
  */
-function makeArray(size, args, loc, type)
-{
-	let depth = size.value.length;
-	if(args.length == depth)
-	{
-		switch(type)
-		{
-			case typeOfValue.typeInt: return new IntValue(0, loc);
-			case typeOfValue.typeFloat: return new FloatValue(0.0, loc);
-			case typeOfValue.typeString: return new StringValue('', loc);
-			case typeOfValue.typeBoolean: return new BooleanValue(true, loc);
-		}
-	}
-	else
-	{
-		let v = [];
-		if(!args) args=[];
-		for(let i = 0; i < size.value[args.length].value + (setting.array_origin != 1 ? 1 : 0); i++)
-		{
-			args.push(i);
-			v.push(makeArray(size, args, loc, type));
-			args.pop();
-		}
-		return new ArrayValue(v, loc);
-	}
-}
+ class DictionaryValue extends Value
+ {
+	 /**
+	  * @constructor
+	  * @param {Array} v 
+	  * @param {Location} loc 
+	  */
+	 constructor(v, loc)
+	 {
+		 super({}, loc);
+		 for(var i = 0; i < v.length; i++)
+		 {
+			 if(v[i] instanceof SliceValue && v[i].getValue1().getValue() instanceof StringValue && !(v[i].getValue2().getValue() instanceof NullValue))
+				 this.value[v[i].getValue1().getValue().value] = v[i].getValue2();
+			 else throw new RuntimeError(loc.first_line, "辞書の初期化が間違っています");
+		 }
+		 this.state = 0;
+	 }
+	 clone()
+	 {
+		 var rtnv = new DictionaryValue({}, this.loc);
+		 for(var key of Object.keys(this.value))
+		 {
+			 if(this.value[key])
+			 {
+				 rtnv.value[key] = this.value[key].getValue().clone();
+			 }
+			 else throw new RuntimeError(this.first_line, keys[i]+"が定義されていません");
+		 }
+		 rtnv.rtnv = rtnv;
+		 return rtnv;
+	 }
+	 getCode()
+	 {
+		 var ag = [];
+		 var keys = Object.keys(this.value);
+		 keys.sort();
+		 for(var i = 0; i < keys.length; i++) 
+			 ag.push(keys[i] + ':' + this.value[keys[i]].getCode());
+		 return '{' + ag.join(',') + '}';
+	 }
+	 getValue()
+	 {
+		 return this.rtnv;
+	 }
+	 run()
+	 {
+		 if(this.state == 0)
+		 {
+			 var a = [];
+			 for(let key of Object.keys(this.value))
+			 {
+				 // a.push(key);
+				 a.push(this.value[key]);
+			 }
+			 code[0].stack.unshift({statementlist: a, index: 0});
+			 this.state = 1;
+		 }
+		 else
+		 {
+			 code[0].stack[0].index++;
+			 var a = [];
+			 for(let key of Object.keys(this.value))
+			 {
+				 a.push(new SliceValue(new StringValue(key, this.loc), this.value[key], this.loc));
+			 }
+			 this.rtnv = new DictionaryValue(a, this.loc);
+			 this.rtnv.rtnv = this.rtnv;
+			 this.state = 0;
+		 }
+	 }
+ }
 
 class IntValue extends Value
 {
@@ -468,7 +709,8 @@ class IntValue extends Value
 	{
 		 super(v, loc);
 		 if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表せない値です");
-	}
+		 this.rtnv = this.value;
+		}
 	clone()
 	{
 		return new IntValue(this.value, this.loc);
@@ -484,10 +726,13 @@ class FloatValue extends Value
 	{
 		super(v, loc);
 		if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
+		this.rtnv = this.value;
 	}
 	getCode()
 	{
-		if(isInteger(this.value)) return this.value + '.0';
+		let str = this.value.toString();
+		if(str.match(/[Ee]/) != undefined)  return str;
+		else if(isSafeInteger(this.value)) return this.value + '.0';
 		else return this.value;
 	}
 	clone()
@@ -504,7 +749,9 @@ class StringValue extends Value
 	constructor(v, loc)
 	{
 		super(v, loc);
+		this.rtnv = this.value;
 	}
+	get length(){return this.value.length;}
 	getCode()
 	{
 		if(this.value.match(/[「」]/)) return '"' + this.value + '"';
@@ -524,6 +771,7 @@ class BooleanValue extends Value
 	constructor(v, loc)
 	{
 		super(v, loc);
+		this.rtnv = this.value;
 	}
 	getCode()
 	{
@@ -545,6 +793,10 @@ class UNDEFINED extends Value
 	{
 		super(v, loc);
 	}
+	clone()
+	{
+		return new UNDEFINED(this.value, this.loc);
+	}
 	get varname()
 	{
 		return this.value;
@@ -559,26 +811,167 @@ class UNDEFINED extends Value
 	}
 }
 
+class Pow extends Value
+{
+	constructor(x, y, loc)
+	{
+		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Pow(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index:0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof IntValue && v2 instanceof IntValue && v2.value >= 0) // 整数の自然数乗
+			{
+				if(v1.value == 0 && v2.value <= 0) throw new RuntimeError(this.first_line, "0は正の数乗しかできません");
+				let v = Math.pow(v1.value, v2.value);
+				if(isSafeInteger(v)) this.rtnv = new IntValue(v, this.loc);
+				else throw new RuntimeError(this.first_line, "整数で表せる範囲を越えました");
+			}
+			else if((v1 instanceof IntValue || v1 instanceof FloatValue) && (v2 instanceof IntValue || v2 instanceof FloatValue))
+			{
+				if(v1.value < 0 && !Number.isSafeInteger(v2.value)) throw new RuntimeError(this.first_line, "負の数の非整数乗はできません");
+				if(v1.value == 0 && v2.value <= 0) throw new RuntimeError(this.first_line, "0は正の数乗しかできません");
+				let v = Math.pow(v1.value, v2.value);
+				if(isFinite(v)) this.rtnv = new FloatValue(v, this.loc);
+				else throw new RuntimeError(this.first_line, "オーバーフローしました");
+			} else throw new RuntimeError('数値でないもののべき乗はできません');
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0], v2 = this.value[1];
+		let c1 = constructor_name(v1), c2 = constructor_name(v2);
+		let brace1 = false, brace2 = false;
+		if(c1 == "Minus" || c1 == "Add" || c1 == "Sub" || c1 == "Mul" || c1 == "Div" || c1 == "DivInt" || c1 == "Mod") brace1 = true;
+		if(c2 == "Minus" || c2 == "Add" || c2 == "Sub" || c2 == "Mul" || c2 == "Div" || c2 == "DivInt" || c2 == "Mod") brace2 = true;
+		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ '**'
+			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
 class Add extends Value
 {
 	constructor(x, y, loc)
 	{
 		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Add(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の足し算はできません");
-		if(v1 instanceof BooleanValue || v2 instanceof BooleanValue) throw new RuntimeError(this.first_line, "真偽型の足し算はできません");
-		if(v1 instanceof StringValue || v2 instanceof StringValue) // 一方でも文字列なら文字列結合
+		if(this.state == 0)
 		{
-			if(v1 instanceof NullValue) this.rtnv = v2;
-			else if(v2 instanceof NullValue) this.rtnv = v1;
-			else this.rtnv = new StringValue(v1.value + v2.value, this.loc);
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
 		}
-		else	// 数値どうし
+		else
 		{
-			let v = v1.value + v2.value; 
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue && v2 instanceof ArrayValue)
+			{
+				let v = []
+				for(let i = 0; i < v1.length; i++) v.push(v1.value[i])
+				for(let i = 0; i < v2.length; i++) v.push(v2.value[i])
+				this.rtnv = new ArrayValue(v, this.loc);
+			}
+			else if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の足し算はできません");
+			else if(v1 instanceof BooleanValue || v2 instanceof BooleanValue) throw new RuntimeError(this.first_line, "真偽型の足し算はできません");
+			else if(v1 instanceof StringValue || v2 instanceof StringValue) // 一方でも文字列なら文字列結合
+			{
+				this.rtnv = new StringValue(v1.value + v2.value, this.loc);
+			}
+			else	// 数値どうし
+			{
+				let v = v1.value + v2.value; 
+				if(v1 instanceof FloatValue || v2 instanceof FloatValue)	// 一方が実数型なら結果は実数型
+				{
+					if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
+					this.rtnv = new FloatValue(v, this.loc);
+				}
+				else	// 整数型
+				{
+					if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
+					this.rtnv = new IntValue(v, this.loc);
+				}
+			}
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0], v2 = this.value[1];
+		let c1 = constructor_name(v1), c2 = constructor_name(v2);
+		let brace1 = false, brace2 = false;
+		if(c1 == "Minus") brace1 = true;
+		if(c2 == "Minus") brace2 = true;
+		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ '+'
+			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
+class Sub extends Value
+{
+	constructor(x, y, loc)
+	{
+		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Sub(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index:0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の引き算はできません");
+			if(v1 instanceof BooleanValue || v2 instanceof BooleanValue) throw new RuntimeError(this.first_line, "真偽型の引き算はできません");
+			if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列の引き算はできません");
+			let v = v1.value - v2.value;
 			if(v1 instanceof FloatValue || v2 instanceof FloatValue)
 			{
 				if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
@@ -589,8 +982,8 @@ class Add extends Value
 				if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
 				this.rtnv = new IntValue(v, this.loc);
 			}
+			this.state = 0;
 		}
-		code[0].stack[0].index++;
 	}
 	getCode()
 	{
@@ -600,46 +993,12 @@ class Add extends Value
 		if(c1 == "Minus") brace1 = true;
 		if(c2 == "Minus") brace2 = true;
 		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
-			+ ' + '
+			+ '-'
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
 	}
-}
-
-class Sub extends Value
-{
-	constructor(x, y, loc)
+	getValue()
 	{
-		super([x,y], loc);
-	}
-	run()
-	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の引き算はできません");
-		if(v1 instanceof BooleanValue || v2 instanceof BooleanValue) throw new RuntimeError(this.first_line, "真偽型の引き算はできません");
-		if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列の引き算はできません");
-		let v = v1.value - v2.value;
-		if(v1 instanceof FloatValue || v2 instanceof FloatValue)
-		{
-			if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
-			this.rtnv = new FloatValue(v, this.loc);
-		}
-		else
-		{
-			if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
-			this.rtnv = new IntValue(v, this.loc);
-		}
-		code[0].stack[0].index++;
-	}
-	getCode()
-	{
-		let v1 = this.value[0], v2 = this.value[1];
-		let c1 = constructor_name(v1), c2 = constructor_name(v2);
-		let brace1 = false, brace2 = false;
-		if(c1 == "Minus") brace1 = true;
-		if(c2 == "Minus") brace2 = true;
-		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
-			+ ' - '
-			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+		return this.rtnv;
 	}
 }
 
@@ -648,25 +1007,65 @@ class Mul extends Value
 	constructor(x, y, loc)
 	{
 		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Mul(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のかけ算はできません");
-		if(v1 instanceof BooleanValue || v2 instanceof BooleanValue) throw new RuntimeError(this.first_line, "真偽型のかけ算はできません");
-		if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のかけ算はできません");
-		let v = v1.value * v2.value;
-		if(v1 instanceof FloatValue || v2 instanceof FloatValue)
+		if(this.state == 0)
 		{
-			if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
-			this.rtnv = new FloatValue(v, this.loc);
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
 		}
 		else
 		{
-			if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
-			this.rtnv = new IntValue(v, this.loc);
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof BooleanValue || v2 instanceof BooleanValue) throw new RuntimeError(this.first_line, "真偽型のかけ算はできません");
+			else if(v1 instanceof StringValue || v2 instanceof StringValue)
+			{
+				let va = null, vn = null;
+				if(v1 instanceof IntValue){va = v2; vn = v1;}
+				else if(v2 instanceof IntValue){va = v1; vn = v2;}
+				else throw new RuntimeError(this.first_line, "文字列には整数しか掛けられません");
+				let v = '';
+				for(let i = 0; i < vn.value; i++)
+					v += va.value;
+				this.rtnv = new StringValue(v, this.loc);
+			}
+			else if(v1 instanceof ArrayValue || v2 instanceof ArrayValue)
+			{
+				let va = null, vn = null;
+				if(v1 instanceof IntValue){va = v2; vn = v1;}
+				else if(v2 instanceof IntValue){va = v1; vn = v2;}
+				else throw new RuntimeError(this.first_line, "配列には整数しか掛けられません");
+				let v = []
+				for(let i = 0; i < vn.value; i++)
+					for(let j = 0; j < va.length; j++) v.push(va.value[j]);
+				this.rtnv = new ArrayValue(v, this.loc);
+			} 
+			else
+			{
+				let v = v1.value * v2.value;
+				if(v1 instanceof FloatValue || v2 instanceof FloatValue)
+				{
+					if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
+					this.rtnv = new FloatValue(v, this.loc);
+				}
+				else
+				{
+					if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
+					this.rtnv = new IntValue(v, this.loc);
+				}
+			}
+			this.state = 0;
 		}
-		code[0].stack[0].index++;
 	}
 	getCode()
 	{
@@ -676,10 +1075,13 @@ class Mul extends Value
 		if(c1 == "Minus" || c1 == "Add" || c1 == "Sub") brace1 = true;
 		if(c2 == "Minus" || c2 == "Add" || c2 == "Sub") brace2 = true;
 		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
-			+ ' * '
+			+ '*'
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
 	}
-
+	getValue()
+	{
+		return this.rtnv;
+	}
 }
 
 class Div extends Value	// /
@@ -687,36 +1089,35 @@ class Div extends Value	// /
 	constructor(x, y, loc)
 	{
 		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Div(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のわり算はできません");
-		if(v1 instanceof BooleanValue || v2 instanceof BooleanValue) throw new RuntimeError(this.first_line, "真偽型のわり算はできません");
-		if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のわり算はできません");
-		if(v2.value == 0 || v2 instanceof NullValue) throw new RuntimeError(this.first_line, "0でわり算をしました");
-		if((v1 instanceof IntValue || v1 instanceof NullValue) && v2 instanceof IntValue)
+		if(this.state == 0)
 		{
-			if(setting.div_mode == 0) // 商の整数部分
-			{
-				let v = (v1.value - v1.value % v2.value) / v2.value
-				if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
-				this.rtnv = new IntValue(v, this.loc);
-			}
-			else // 商
-			{
-				let v = v1.value / v2.value;
-				if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
-				this.rtnv = new FloatValue(v, this.loc);
-			}
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
 		}
 		else
 		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のわり算はできません");
+			if(v1 instanceof BooleanValue || v2 instanceof BooleanValue) throw new RuntimeError(this.first_line, "真偽型のわり算はできません");
+			if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のわり算はできません");
+			if(v2.value == 0) throw new RuntimeError(this.first_line, "0でわり算をしました");
 			let v = v1.value / v2.value;
 			if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
 			this.rtnv = new FloatValue(v, this.loc);
+			this.state = 0;
 		}
-		code[0].stack[0].index++;
 	}
 	getCode()
 	{
@@ -726,37 +1127,50 @@ class Div extends Value	// /
 		if(c1 == "Minus" || c1 == "Add" || c1 == "Sub") brace1 = true;
 		if(c2 == "Minus" || c2 == "Add" || c2 == "Sub") brace2 = true;
 			return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
-			+ ' / '
+			+ '/'
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
 	}
 }
 
-class Div2 extends Value	// ÷ 整数どうしなら必ず商の整数部分を返す
+class Div2 extends Value // ÷
 {
 	constructor(x, y, loc)
 	{
 		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new DivInt(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のわり算はできません");
-		if(v1 instanceof BooleanValue || v2 instanceof BooleanValue) throw new RuntimeError(this.first_line, "真偽型のわり算はできません");
-		if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のわり算はできません");
-		if(v2.value == 0 || v2 instanceof NullValue) throw new RuntimeError(this.first_line, "0でわり算をしました");
-		if((v1 instanceof IntValue || v1 instanceof NullValue) && v2 instanceof IntValue)
+		if(this.state == 0)
 		{
-			let v = (v1.value - v1.value % v2.value) / v2.value
-			if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
-			this.rtnv = new IntValue(v, this.loc);
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
 		}
 		else
 		{
-			let v = v1.value / v2.value;
-			if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
-			this.rtnv = new FloatValue(v, this.loc);
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof IntValue && v2 instanceof IntValue)
+			{
+				if(v2.value == 0) throw new RuntimeError(this.first_line, "0でわり算をしました");
+				let v = Math.floor(v1.value / v2.value);
+				if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
+				this.rtnv = new IntValue(v, this.loc);
+			}
+			else throw new RuntimeError(this.first_line, '整数にしか「÷」は使えません');
+			this.state = 0;
 		}
-		code[0].stack[0].index++;
 	}
 	getCode()
 	{
@@ -765,33 +1179,52 @@ class Div2 extends Value	// ÷ 整数どうしなら必ず商の整数部分を�
 		let brace1 = false, brace2 = false;
 		if(c1 == "Minus" || c1 == "Add" || c1 == "Sub") brace1 = true;
 		if(c2 == "Minus" || c2 == "Add" || c2 == "Sub") brace2 = true;
-		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
-			+ ' ÷ '
+			return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ '÷'
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
 	}
-
+	getValue()
+	{
+		return this.rtnv;
+	}
 }
-
 
 class Mod extends Value
 {
 	constructor(x, y, loc)
 	{
 		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Mod(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if((v1 instanceof IntValue || v1 instanceof NullValue) && (v2 instanceof IntValue || v2 instanceof NullValue))
+		if(this.state == 0)
 		{
-			if(v2.value == 0) throw new RuntimeError(this.first_line, "0でわり算をしました");
-			let v = v1.value % v2.value;
-			if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
-			this.rtnv = new IntValue(v, this.loc);
-			code[0].stack[0].index++;
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
 		}
 		else
-			throw new RuntimeError(this.first_line, "余りを出す計算は整数でしかできません");
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof IntValue && v2 instanceof IntValue)
+			{
+				if(v2.value == 0) throw new RuntimeError(this.first_line, "0でわり算をしました");
+				let v = v1.value - Math.floor(v1.value / v2.value) * v2.value;
+				if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
+				this.rtnv = new IntValue(v, this.loc);
+			}
+			else
+				throw new RuntimeError(this.first_line, "余りを出す計算は整数でしかできません");
+			this.state = 0;
+		}
 	}
 	getCode()
 	{
@@ -801,8 +1234,12 @@ class Mod extends Value
 		if(c1 == "Minus" || c1 == "Add" || c1 == "Sub") brace1 = true;
 		if(c2 == "Minus" || c2 == "Add" || c2 == "Sub") brace2 = true;
 		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
-			+ ' % '
+			+ '%'
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
 	}
 }
 
@@ -811,21 +1248,37 @@ class Minus extends Value
 	constructor(x, loc)
 	{
 		super([x], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Minus(this.value[0], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	run()
 	{
-		let v1 = this.value[0].getValue();
-		if(v1 instanceof NullValue) this.rtnv = v1;
-		else if(v1 instanceof IntValue || v1 instanceof FloatValue)
+		if(this.state == 0)
 		{
-			let v = -v1.value;
-			if(v instanceof IntValue && !isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
-			if(v instanceof FloatValue && !isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
-			this.rtnv = v1 instanceof IntValue ? new IntValue(v, this.loc) : new FloatValue(v, this.loc);
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
 		}
 		else
-			throw new RuntimeError(this.first_line, "マイナスは数値にしかつけられません");
-		code[0].stack[0].index++;
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue();
+			if(v1 instanceof IntValue || v1 instanceof FloatValue)
+			{
+				let v = -v1.value;
+				if(v1 instanceof IntValue && !isSafeInteger(v)) throw new RuntimeError(this.first_line, "整数で表される範囲を越えました");
+				if(v1 instanceof FloatValue && !isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
+				this.rtnv = v1 instanceof IntValue ? new IntValue(v, this.loc) : new FloatValue(v, this.loc);
+			}
+			else
+				throw new RuntimeError(this.first_line, "マイナスは数値にしかつけられません");
+			this.state = 0;
+		}
 	}
 	getCode()
 	{
@@ -835,27 +1288,50 @@ class Minus extends Value
 		if(c1 == "Minus" || c1 == "Add" || c1 == "Sub") brace1 = true;
 		return '-' + (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '');
 	}
-
+	getValue()
+	{
+		return this.rtnv;
+	}
 }
 
 class And extends Value
 {
-	constructor(x, y, loc){super([x,y],loc);}
+	constructor(x, y, loc)
+	{
+		super([x,y],loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new And(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
 	run()
 	{
-		let v1 = this.value[0].getValue();
-		if(v1 instanceof BooleanValue)
+		if(this.state == 0)
 		{
-			if(!v1.value) this.rtnv = new BooleanValue(false, this.loc);
-			else
-			{
-				let v2 = this.value[1].getValue();
-				if(v2 instanceof BooleanValue) this.rtnv = new BooleanValue(v2.value, this.loc);
-			}
-			code[0].stack[0].index++;
+			code[0].stack.unshift({statementlist: this.value, index:0});
+			this.state = 1;
 		}
 		else
-			throw new RuntimeError(this.first_line, "「かつ」は真偽値にしか使えません");
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue();
+			if(v1 instanceof BooleanValue)
+			{
+				if(!v1.value) this.rtnv = new BooleanValue(false, this.loc);
+				else
+				{
+					let v2 = this.value[1].getValue();
+					if(v2 instanceof BooleanValue) this.rtnv = new BooleanValue(v2.value, this.loc);
+				}
+			}
+			else
+				throw new RuntimeError(this.first_line, "「かつ」は真偽値にしか使えません");
+			this.state = 0;
+		}
 	}
 	getCode()
 	{
@@ -864,29 +1340,53 @@ class And extends Value
 		let brace1 = false, brace2 = false;
 		if(c2 == "And" || c2 == "Or" || c2 == "Not") brace2 = true;
 		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
-			+ ' かつ '
+			+ 'かつ'
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
 	}
 }
 
 class Or extends Value
 {
-	constructor(x, y, loc){super([x,y],loc);}
+	constructor(x, y, loc)
+	{
+		super([x,y],loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Or(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
 	run()
 	{
-		let v1 = this.value[0].getValue();
-		if(v1 instanceof BooleanValue)
+		if(this.state == 0)
 		{
-			if(v1.value) this.rtnv = new BooleanValue(true, this.loc);
-			else
-			{
-				let v2 = this.value[1].getValue();
-				if(v2 instanceof BooleanValue) this.rtnv = new BooleanValue(v2.value, this.loc);
-			}
-			code[0].stack[0].index++;
+			code[0].stack.unshift({statementlist: this.value, index:0});
+			this.state = 1;
 		}
 		else
-			throw new RuntimeError(this.first_line, "「または」は真偽値にしか使えません");
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue();
+			if(v1 instanceof BooleanValue)
+			{
+				if(v1.value) this.rtnv = new BooleanValue(true, this.loc);
+				else
+				{
+					let v2 = this.value[1].getValue();
+					if(v2 instanceof BooleanValue) this.rtnv = new BooleanValue(v2.value, this.loc);
+				}
+			}
+			else
+				throw new RuntimeError(this.first_line, "「または」は真偽値にしか使えません");
+			this.state = 0;
+		}
 	}
 	getCode()
 	{
@@ -895,30 +1395,383 @@ class Or extends Value
 		let brace1 = false, brace2 = false;
 		if(c2 == "And" || c2 == "Or" || c2 == "Not") brace2 = true;
 		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
-			+ ' または '
+			+ 'または'
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
 	}
+	getValue()
+	{
+		return this.rtnv;
+	}
 }
+
 class Not extends Value
 {
-	constructor(x, loc){super([x],loc);}
+	constructor(x, loc)
+	{
+		super([x],loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Not(this.value[0], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
 	run()
 	{
-		let v1 = this.value[0].getValue();
-		if(v1 instanceof BooleanValue) this.rtnv = new BooleanValue(!v1.value, this.loc);
-		else throw new RuntimeError(this.first_line, "「でない」は真偽値にしか使えません");
-		code[0].stack[0].index++;
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index:0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue();
+			if(v1 instanceof BooleanValue) this.rtnv = new BooleanValue(!v1.value, this.loc);
+			else throw new RuntimeError(this.first_line, "「でない」は真偽値にしか使えません");
+			this.state = 0;
+		}
 	}
 	getCode()
 	{
 		let v1 = this.value[0];
 		let c1 = constructor_name(v1);
 		let brace1 = false;
-//		if(c2 == "And" || c2 == "Or" || c2 == "Not") brace2 = true;
+	//	if(c2 == "And" || c2 == "Or" || c2 == "Not") brace2 = true;
 		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
-			+ ' でない';
+			+ 'でない';
+	}
+	getValue()
+	{
+		return this.rtnv;
 	}
 }
+
+class BitAnd extends Value
+{
+	constructor(x, y, loc)
+	{
+		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new BitAnd(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index:0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のビット積はできません");
+			else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のビット積はできません");
+			else if(v1 instanceof BooleanValue && v2 instanceof BooleanValue) this.rtnv = new BooleanValue(v1.value & v2.value, this.loc);
+			else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数のビット積はできません");
+			else
+			{
+				if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+				if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+				this.rtnv = new IntValue(v1.value & v2.value, this.loc);
+			}
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0], v2 = this.value[1];
+		let c1 = constructor_name(v1), c2 = constructor_name(v2);
+		let brace1 = false, brace2 = false;
+		if(c1 == "Minus" || c1 == "BitRShift" || c1 == "BitLShift") brace1 = true;
+		if(c2 == "Minus" || c2 == "BitRShift" || c2 == "BitLShift") brace2 = true;
+		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ '&'
+			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
+class BitOr extends Value
+{
+	constructor(x, y, loc)
+	{
+		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new BitOr(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index:0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のビット和はできません");
+			else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のビット和はできません");
+			else if(v1 instanceof BooleanValue && v2 instanceof BooleanValue) this.rtnv = new BooleanValue(v1.value & v2.value, this.loc);
+			else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数のビット和はできません");
+			else
+			{
+				if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+				if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+				this.rtnv = new IntValue(v1.value | v2.value, this.loc);
+			}
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0], v2 = this.value[1];
+		let c1 = constructor_name(v1), c2 = constructor_name(v2);
+		let brace1 = false, brace2 = false;
+		if(c1 == "Minus" || c1 == "BitRShift" || c1 == "BitLShift" || c1 == "BitNot") brace1 = true;
+		if(c2 == "Minus" || c2 == "BitRShift" || c2 == "BitLShift" || c2 == "BitNot") brace2 = true;
+		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ '|'
+			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
+class BitXor extends Value
+{
+	constructor(x, y, loc)
+	{
+		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new BitXor(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の排他的ビット和はできません");
+			else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列の排他的ビット和はできません");
+			else if(v1 instanceof BooleanValue && v2 instanceof BooleanValue) this.rtnv = new BooleanValue(v1.value & v2.value, this.loc);
+			else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数の排他的ビット和はできません");
+			else
+			{
+				if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+				if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+				this.rtnv = new IntValue(v1.value ^ v2.value, this.loc);
+			}
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0], v2 = this.value[1];
+		let c1 = constructor_name(v1), c2 = constructor_name(v2);
+		let brace1 = false, brace2 = false;
+		if(c1 == "Minus" || c1 == "BitRShift" || c1 == "BitLShift" || c1 == "BitNot") brace1 = true;
+		if(c2 == "Minus" || c2 == "BitRShift" || c2 == "BitLShift" || c2 == "BitNot") brace2 = true;
+		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ '^'
+			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
+class BitNot extends Value
+{
+	constructor(x, loc)
+	{
+		super([x], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new BitNot(this.value[0], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 0;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue()
+			if(v1 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のビット反転はできません");
+			else if(v1 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のビット反転はできません");
+			else if(v1 instanceof BooleanValue) this.rtnv = new BooleanValue(!v1.value, this.loc);
+			else if(v1 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数のビット反転はできません");
+			else
+			{
+				this.rtnv = new IntValue(~v1.value, this.loc);
+			}
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0];
+		let c1 = constructor_name(v1);
+		let brace1 = false;
+		if(c1 == "Minus" || c1 == "BitRShift" || c1 == "BitLShift") brace1 = true;
+		return '~' + (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '');
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
+class BitLShift extends Value
+{
+	constructor(x, y, loc)
+	{
+		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new BitLShift(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のビットシフトはできません");
+			else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のビットシフトはできません");
+			else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数のビットシフトはできません");
+			else
+			{
+				if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+				if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+				this.rtnv = new IntValue(v1.value << v2.value, this.loc);
+			}
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0], v2 = this.value[1];
+		let c1 = constructor_name(v1), c2 = constructor_name(v2);
+		let brace1 = false, brace2 = false;
+		if(c1 == "Minus" || c1 == "BitNot") brace1 = true;
+		if(c2 == "Minus" || c2 == "BitNot") brace2 = true;
+		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ '<<'
+			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
+class BitRShift extends Value
+{
+	constructor(x, y, loc)
+	{
+		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new BitRShift(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].state[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のビットシフトはできません");
+			else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のビットシフトはできません");
+			else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数のビットシフトはできません");
+			else
+			{
+				if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+				if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+				this.rtnv = new IntValue(v1.value >> v2.value, this.loc);
+			}
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0], v2 = this.value[1];
+		let c1 = constructor_name(v1), c2 = constructor_name(v2);
+		let brace1 = false, brace2 = false;
+		if(c1 == "Minus" || c1 == "BitNot") brace1 = true;
+		if(c2 == "Minus" || c2 == "BitNot") brace2 = true;
+		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ '>>'
+			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
 
 
 /**
@@ -926,27 +1779,42 @@ class Not extends Value
  * @param {ArrayValue} v1 
  * @param {ArrayValue} v2 
  */
-function ArrayCompare(v1, v2)
-{
-	var rtnv = true;
-	if(v1 instanceof ArrayValue && v2 instanceof ArrayValue)
-	{
-		if(v1.length != v2.length) return false;
-		for(let i = 0; i < v1.length; i++) rtnv = rtnv && ArrayCompare(v1.nthValue(i), v2.nthValue(i));
-	}
-	else rtnv = rtnv && typeof v1 == typeof v2 && v1.value == v2.value;
-	return rtnv;
-}
-
+ function ArrayCompare(v1, v2)
+ {
+	 var rtnv = true;
+	 if(v1 instanceof ArrayValue && v2 instanceof ArrayValue)
+	 {
+		 if(v1.length != v2.length) return false;
+		 for(let i = 0; i < v1.length; i++) rtnv = rtnv && ArrayCompare(v1.getValue().value[i], v2.getValue().value[i]);
+	 }
+	 else rtnv = rtnv && typeof v1 == typeof v2 && v1.value == v2.value;
+	 return rtnv;
+ }
+ 
 class EQ extends Value
 {
-	constructor(x, y, loc){super([x,y], loc);}
+	constructor(x, y, loc){super([x,y], loc); this.state = 0;}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) this.rtnv = new BooleanValue(ArrayCompare(v1, v2), this.loc);
-		else this.rtnv = new BooleanValue(v1.value == v2.value, this.loc);
-		code[0].stack[0].index++;
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) this.rtnv = new BooleanValue(ArrayCompare(v1, v2), this.loc);
+			else this.rtnv = new BooleanValue(v1.value == v2.value, this.loc);
+			code[0].stack[0].index++;
+			this.state = 0;
+		}
+	}
+	clone()
+	{
+		var rtnv = new EQ(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	getCode()
 	{
@@ -957,17 +1825,36 @@ class EQ extends Value
 			+ ' = '
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
 	}
+	getValue()
+	{
+		return this.rtnv;
+	}
 }
 
 class NE extends Value
 {
-	constructor(x, y, loc){super([x,y], loc);}
+	constructor(x, y, loc){super([x,y], loc); this.state = 0;}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) this.rtnv = new BooleanValue(!ArrayCompare(v1, v2), this.loc);
-		else this.rtnv = new BooleanValue(v1.value != v2.value, this.loc);
-		code[0].stack[0].index++;
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) this.rtnv = new BooleanValue(!ArrayCompare(v1, v2), this.loc);
+			else this.rtnv = new BooleanValue(v1.value != v2.value, this.loc);
+			code[0].stack[0].index++;
+			this.state = 0;
+		}
+	}
+	clone()
+	{
+		var rtnv = new NE(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	getCode()
 	{
@@ -978,17 +1865,36 @@ class NE extends Value
 			+ ' != '
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
 	}
+	getValue()
+	{
+		return this.rtnv;
+	}
 }
 
 class GT extends Value
 {
-	constructor(x, y, loc){super([x,y], loc);}
+	constructor(x, y, loc){super([x,y], loc); this.state = 0;}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列を比べることはできません")
-		this.rtnv = new BooleanValue(v1.value > v2.value, this.loc);
-		code[0].stack[0].index++;
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列を比べることはできません")
+			this.rtnv = new BooleanValue(v1.value > v2.value, this.loc);
+			code[0].stack[0].index++;
+			this.state = 0;
+		}
+	}
+	clone()
+	{
+		var rtnv = new GT(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	getCode()
 	{
@@ -999,17 +1905,36 @@ class GT extends Value
 			+ ' > '
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
 	}
+	getValue()
+	{
+		return this.rtnv;
+	}
 }
 
 class GE extends Value
 {
-	constructor(x, y, loc){super([x,y], loc);}
+	constructor(x, y, loc){super([x,y], loc); this.state = 0;}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列を比べることはできません")
-		this.rtnv = new BooleanValue(v1.value >= v2.value, this.loc);
-		code[0].stack[0].index++;
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列を比べることはできません")
+			this.rtnv = new BooleanValue(v1.value >= v2.value, this.loc);
+			code[0].stack[0].index++;
+			this.state = 0;
+		}
+	}
+	clone()
+	{
+		var rtnv = new GE(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	getCode()
 	{
@@ -1020,17 +1945,36 @@ class GE extends Value
 			+ ' >= '
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
 	}
+	getValue()
+	{
+		return this.rtnv;
+	}
 }
 
 class LT extends Value
 {
-	constructor(x, y, loc){super([x,y], loc);}
+	constructor(x, y, loc){super([x,y], loc); this.state = 0;}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列を比べることはできません")
-		this.rtnv = new BooleanValue(v1.value < v2.value, this.loc);
-		code[0].stack[0].index++;
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列を比べることはできません")
+			this.rtnv = new BooleanValue(v1.value < v2.value, this.loc);
+			code[0].stack[0].index++;
+			this.state  = 0;
+		}
+	}
+	clone()
+	{
+		var rtnv = new LT(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	getCode()
 	{
@@ -1041,17 +1985,36 @@ class LT extends Value
 			+ ' < '
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
 	}
+	getValue()
+	{
+		return this.rtnv;
+	}
 }
 
 class LE extends Value
 {
-	constructor(x, y, loc){super([x,y], loc);}
+	constructor(x, y, loc){super([x,y], loc); this.state = 0;}
 	run()
 	{
-		let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
-		if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列を比べることはできません")
-		this.rtnv = new BooleanValue(v1.value <= v2.value, this.loc);
-		code[0].stack[0].index++;
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列を比べることはできません")
+			this.rtnv = new BooleanValue(v1.value <= v2.value, this.loc);
+			code[0].stack[0].index++;
+			this.state = 0;
+		}
+	}
+	clone()
+	{
+		var rtnv = new LE(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	}
 	getCode()
 	{
@@ -1061,6 +2024,120 @@ class LE extends Value
 		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
 			+ ' <= '
 			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
+class IN extends Value
+{
+	constructor(x, y, loc)
+	{
+		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new IN(this.value[0], this.value[1], this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let v1 = this.value[0].getValue(), v2 = this.value[1].getValue();
+			var flag = false;
+			if(v1 instanceof ArrayValue)
+				for(let i = 0; i < v1.value.length; i++) flag |= ArrayCompare(v1.value[i], v2);
+			else throw new RuntimeError(this.first_line, "\"の中に\"の前には配列が必要です");
+			this.rtnv = new BooleanValue(flag, this.loc);
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0], v2 = this.value[1];
+		let brace1 = false, brace2 = false;
+		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ 'の中に'
+			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+}
+
+class NumberOf extends Value
+{
+	constructor(x, y, loc)
+	{
+		super([x,y], loc);
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new NumberOf(this.value[0].clone(), this.value[1].clone(), this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let vt = new varTable();
+			let statementlist = [];
+			let globalvarTable = varTables[varTables.length - 1];
+			for(let v of Object.keys(globalvarTable.vars)) vt.vars[v] = globalvarTable.vars[v].getValue().clone();
+			for(let v of Object.keys(varTables[0].vars)) vt.vars[v] = varTables[0].vars[v].getValue().clone();
+			// 空リストを'!'という変数に代入する。カウンタは'!!'
+			let var1 = new Variable('!', null, this.loc);
+			let var2 = new Variable('!!', null, this.loc);
+			statementlist.push(new Assign(var1, new ArrayValue([], this.loc), null, this.loc));
+			statementlist.push(new ForInc(var2, new IntValue(1, this.loc),this.value[0].getValue(), new IntValue(1, this.loc),
+				[this.value[1], new Append(var1, this.value[1], this.loc)], this.loc));
+			// statementlist.push(new runBeforeGetValue([var1], this.loc));
+			statementlist.push(var1);
+			statementlist.push(new ReturnStatement(var1, this.loc));
+	
+			setCaller(statementlist, this);
+			code.unshift(new parsedFunction(statementlist));
+			varTables.unshift(vt);
+			this.state = 0;
+		}
+	}
+	getCode()
+	{
+		let v1 = this.value[0], v2 = this.value[1];
+		let brace1 = false, brace2 = false;
+		return (brace1 ? '(' : '') + v1.getCode() + (brace1 ? ')' : '')
+			+ '個の'
+			+ (brace2 ? '(' : '') + v2.getCode() + (brace2 ? ')' : '')
+	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+	setValue(v)
+	{
+		this.rtnv = v.clone();
 	}
 }
 
@@ -1072,30 +2149,40 @@ class Variable extends Value
 	 * @param {ArrayValue} y 
 	 * @param {Location} loc 
 	 */
-	constructor(x, y, loc){super([x,y],loc);}
+	constructor(x, y, loc)
+	{
+		super([x,y],loc); 
+		this.rtnv = null;
+		this.state = 0;
+	}
+	clone()
+	{
+		var rtnv = new Variable(this.value[0], this.value[1] ? this.value[1].clone() : null, this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
+	}
 	get varname(){return this.value[0];}
 	get args(){return this.value[1];}
 	run()
 	{
-		let vn = this.value[0];
-		let vt = findVarTable(vn);	// 変数は定義されてるか
-		if(vt)
+		if(this.state == 0)
 		{
-//			this.rtnv = vt.vars[vn];
-			let v = vt.vars[vn];
-			if(v instanceof IntValue) this.rtnv = new IntValue(v.value, this.loc);
-			else if(v instanceof FloatValue) this.rtnv = new FloatValue(v.value, this.loc);
-			else if(v instanceof StringValue) this.rtnv = new StringValue(v.value, this.loc);
-			else if(v instanceof BooleanValue) this.rtnv = new BooleanValue(v.value, this.loc);
-			else if(v instanceof ArrayValue) this.rtnv = v.getValueFromArray(this.args, this.loc);
-			else throw new RuntimeError(this.first_line, "Unknown Error");
+			if(this.args) code[0].stack.unshift({statementlist: this.args.value, index: 0});
+			this.state = 1;
 		}
 		else
 		{
-			if(setting.var_declaration == 0) throw new RuntimeError(this.first_line, "変数" + vn + "は宣言されていません");
-			else this.rtnv = new NullValue(this.loc);
+			code[0].stack[0].index++;
+			let vn = this.varname;		// 変数名
+			let vt = findVarTable(vn);	// 変数は定義されてるか
+			if(vt)
+			{
+				let v = vt.vars[vn];
+				this.rtnv = getValueByArgs(v, this.args ? this.args.value : null, this.loc);
+			}
+			else throw new RuntimeError(this.first_line, "変数" + this.varname + "が定義されていません");
+			this.state = 0;
 		}
-		code[0].stack[0].index++;
 	}
 	getCode()
 	{
@@ -1112,334 +2199,537 @@ class Variable extends Value
 		}
 		return vn;
 	}
+	getValue()
+	{
+		return this.rtnv;
+	}
+	append(a)
+	{
+		if(this.args) this.args.append(a);
+		else this.value[1] = new ArrayValue(a, this.loc);
+	}
 }
 
 /**
  * 定義済み関数クラス
  */
-class DefinedFunction
-{
-	/**
-	 * @constructor
-	 * @param {number} argc 引数の個数
-	 * @param {function} func 実際の関数
-	 */
-	constructor(argc, func) { this.argc = argc; this.func = func;}
-	/**
-	 * 関数の値を返す
-	 * @param {Array<Value>} parameters 
-	 * @param {Location} loc 
-	 * @returns {any}
-	 */
-	exec(parameters, loc)
-	{
-		if((this.argc instanceof Array && this.argc[0] <= parameters.length && this.argc[1] >= parameters.length)
-			|| parameters.length == this.argc)
-			return this.func(parameters, loc);
-		throw new RuntimeError(loc.first_line, "引数の個数が違います");
-	}
-}
-
+ class DefinedFunction
+ {
+	 /**
+	  * @constructor
+	  * @param {number} argc 引数の個数
+	  * @param {function} func 実際の関数
+	  */
+	 constructor(argc, func) { 
+		 this.argc = argc; this.func = func;
+		 this.caller = null;
+		 this.loc = null;
+	 }
+	 /**
+	  * 関数の値を返す
+	  * @param {Array<Value>} parameters 
+	  * @param {Location} loc 
+	  * @returns {any}
+	  */
+	 run()
+	 {
+		 if((this.argc instanceof Array && this.argc[0] <= this.parameters.length && this.argc[1] >= this.parameters.length)
+			 || this.parameters.length == this.argc)
+			 {
+				 code[0].stack[0].index++;
+				 this.caller.setValue(this.func(this.parameters, this.loc));
+				 code.shift();
+			 }
+		 else throw new RuntimeError(this.loc.first_line, "引数の個数が違います");
+	 }
+	 clone()
+	 {
+		 return new DefinedFunction(this.argc, this.func);
+	 }
+	 setCaller(caller)
+	 {
+		 this.caller = caller;
+	 }
+	 setParameter(params)
+	 {
+		 this.parameters = params;
+	 }
+	 setLocation(loc)
+	 {
+		 this.loc = loc;
+	 }
+ }
+ 
 /**
  * 定義済み関数一覧
  */
-var definedFunction = {
+ var definedFunction = {
+	"keys": new DefinedFunction(1, function(param, loc){
+		var par1 = param[0].getValue();
+		if(par1 instanceof DictionaryValue)
+		{
+			var args = [];
+			var keys = Object.keys(par1.value);
+			keys.sort();
+			for(let i = 0; i < keys.length; i++) args.push(new StringValue(keys[i], loc));
+			return new ArrayValue(args, this.loc);
+		}
+		else throw new RuntimeError(loc.first_line, 'keysは辞書にしか使えません');
+	}),
 	"abs": new DefinedFunction(1, function (param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue) return new IntValue(Math.abs(par1.value), loc);
+		if(par1 instanceof IntValue) return new IntValue(Math.abs(par1.value), loc);
 		else if(par1 instanceof FloatValue) return new FloatValue(Math.abs(par1.value), loc);
-		else throw new RuntimeError(loc.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(loc.first_line, "absは数値にしか使えません");
 	}),
-	"random": new DefinedFunction(1, function(param, loc){
-		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue) return new IntValue(Math.floor(Math.random() * Math.floor(par1.value + 1)), this.loc);
-		else throw new RuntimeError(this.first_line, func + "は整数にしか使えません");
+	"random": new DefinedFunction([0,1], function(param, loc){
+		if(param.length == 0) return new FloatValue(Math.random(), this.loc);
+		else{
+			var par1 = param[0].getValue();
+			if(par1 instanceof IntValue) return new IntValue(Math.floor(Math.random() * Math.floor(par1.value + 1)), this.loc);
+			else throw new RuntimeError(loc.first_line, "randomは整数にしか使えません");
+		} 
 	}),
 	"ceil": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue) return par1;
+		if(par1 instanceof IntValue) return par1;
 		else if(par1 instanceof FloatValue) return new IntValue(Math.ceil(par1.value), this.loc);
-		else throw new RuntimeError(this.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(loc.first_line, "ceilは数値にしか使えません");
 	}),
 	"floor": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue) return par1;
+		if(par1 instanceof IntValue) return par1;
 		else if(par1 instanceof FloatValue) return new IntValue(Math.floor(par1.value), this.loc);
-		else throw new RuntimeError(this.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(loc.first_line, "floorは数値にしか使えません");
 	}),
 	"round": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue) return par1;
+		if(par1 instanceof IntValue) return par1;
 		else if(par1 instanceof FloatValue) return new IntValue(Math.round(par1.value), this.loc);
-		else throw new RuntimeError(this.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(loc.first_line, "roundは数値にしか使えません");
 	}),
 	"sin": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue || par1 instanceof FloatValue)
+		if(par1 instanceof IntValue || par1 instanceof FloatValue)
 			return new FloatValue(Math.sin(par1.value), this.loc);
-		else throw new RuntimeError(this.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(loc.first_line, "sinは数値にしか使えません");
 	}),
 	"cos": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue || par1 instanceof FloatValue)
+		if(par1 instanceof IntValue || par1 instanceof FloatValue)
 			return new FloatValue(Math.cos(par1.value), this.loc);
-		else throw new RuntimeError(this.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(loc.first_line, "cosは数値にしか使えません");
 	}),
 	"tan": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue || par1 instanceof FloatValue)
+		if(par1 instanceof IntValue || par1 instanceof FloatValue)
 		{
 			let v = Math.tan(par1.value);
 			if(isFinite(v)) return new FloatValue(v, this.loc);
-			else throw new RuntimeError(this.first_line, "オーバーフローしました");
+			else throw new RuntimeError(loc.first_line, "オーバーフローしました");
 		}
-		else throw new RuntimeError(this.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(loc.first_line, "tanは数値にしか使えません");
+	}),
+	"asin": new DefinedFunction(1, function(param, loc){
+		var par1 = param[0].getValue();
+		if(par1 instanceof IntValue || par1 instanceof FloatValue)
+		{
+			if(par1.value > 1.0 || par1.value < -1.0)
+				throw new RuntimeError(loc.first_line, "asinの定義域外の値が使われました");
+			else
+				return new FloatValue(Math.asin(par1.value), this.loc);
+		}
+		else throw new RuntimeError(loc.first_line, "asinは数値にしか使えません");
+	}),
+	"acos": new DefinedFunction(1, function(param, loc){
+		var par1 = param[0].getValue();
+		if(par1 instanceof IntValue || par1 instanceof FloatValue)
+		{
+			if(par1.value > 1.0 || par1.value < -1.0)
+				throw new RuntimeError(loc.first_line, "acosの定義域外の値が使われました");
+			else
+				return new FloatValue(Math.acos(par1.value), this.loc);
+		}
+		else throw new RuntimeError(loc.first_line, "acosは数値にしか使えません");
+	}),
+	"atan": new DefinedFunction(1, function(param, loc){
+		var par1 = param[0].getValue();
+		if(par1 instanceof IntValue || par1 instanceof FloatValue)
+			return new FloatValue(Math.atan(par1.value), this.loc);
+		else throw new RuntimeError(loc.first_line, "atanは数値にしか使えません");
+	}),
+	"atan2": new DefinedFunction(2, function(param, loc){
+		var par1 = param[0].getValue();
+		var par2 = param[1].getValue();
+		if((par1 instanceof IntValue || par1 instanceof FloatValue) && 
+		   (par2 instanceof IntValue || par2 instanceof FloatValue))
+			return new FloatValue(Math.atan2(par1.value, par2.value), this.loc);
+		else throw new RuntimeError(loc.first_line, "atan2は数値にしか使えません");
 	}),
 	"sqrt": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue || par1 instanceof FloatValue)
+		if(par1 instanceof IntValue || par1 instanceof FloatValue)
 		{
-			if(par1.value < 0) throw new RuntimeError(this.first_line, "負の数のルートを求めようとしました");
+			if(par1.value < 0) throw new RuntimeError(loc.first_line, "負の数のルートを求めようとしました");
 			 return new FloatValue(Math.sqrt(par1.value), this.loc);
 		}
-		else throw new RuntimeError(this.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(this.first_line, "sqrtは数値にしか使えません");
 	}),
 	"log": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue || par1 instanceof FloatValue)
+		if(par1 instanceof IntValue || par1 instanceof FloatValue)
 		{
-			if(par1.value <= 0) throw new RuntimeError(this.first_line, "正でない数の対数を求めようとしました");
+			if(par1.value <= 0) throw new RuntimeError(loc.first_line, "正でない数の対数を求めようとしました");
 			let v = Math.log(par1.value);
 			if(isFinite(v)) return new FloatValue(v, this.loc);
 			throw new RuntimeError(this.first_line, "オーバーフローしました");
 		}
-		else throw new RuntimeError(this.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(loc.first_line, "logは数値にしか使えません");
 	}),
 	"exp": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue || par1 instanceof IntValue || par1 instanceof FloatValue)
+		if(par1 instanceof IntValue || par1 instanceof FloatValue)
 		{
 			let v = Math.exp(par1.value);
 			if(isFinite(v)) return new FloatValue(v, this.loc);
-			throw new RuntimeError(this.first_line, "オーバーフローしました");
+			throw new RuntimeError(loc.first_line, "オーバーフローしました");
 		}
-		else throw new RuntimeError(this.first_line, func + "は数値にしか使えません");
+		else throw new RuntimeError(loc.first_line, "expは数値にしか使えません");
 	}),
 	"pow": new DefinedFunction(2, function(param, loc){
 		var par1 = param[0].getValue();
 		var par2 = param[1].getValue();
-		if((par1 instanceof NullValue || par1 instanceof IntValue) && (par2 instanceof NullValue || par2 instanceof IntValue) && par2.value >= 0)
+		if(par1 instanceof IntValue && par2 instanceof IntValue && par2.value >= 0)
 		{
-			if(par1.value == 0 && par2.value <= 0) throw new RuntimeError(this.first_line, "0は正の数乗しかできません");
+			if(par1.value == 0 && par2.value <= 0) throw new RuntimeError(loc.first_line, "0は正の数乗しかできません");
 			let v = Math.pow(par1.value, par2.value);
 			if(isSafeInteger(v)) return new IntValue(v, this.loc);
-			else throw new RuntimeError(this.first_line, "オーバーフローしました");
+			else throw new RuntimeError(loc.first_line, "整数で表せる範囲を越えました");
 		}
-		if((par1 instanceof NullValue || par1 instanceof IntValue || par1 instanceof FloatValue) &&
-			(par2 instanceof NullValue || par2 instanceof IntValue || par2 instanceof FloatValue))
+		else if((par1 instanceof IntValue || par1 instanceof FloatValue) &&
+			(par2 instanceof IntValue || par2 instanceof FloatValue))
 		{
-			if(par1.value < 0 && !Number.isInteger(par2.value)) throw new RuntimeError(this.first_line, "負の数の非整数乗はできません");
-			if(par1.value == 0 && par2.value <= 0) throw new RuntimeError(this.first_line, "0は正の数乗しかできません");
+			if(par1.value < 0 && !Number.isInteger(par2.value)) throw new RuntimeError(loc.first_line, "負の数の非整数乗はできません");
+			if(par1.value == 0 && par2.value <= 0) throw new RuntimeError(loc.first_line, "0は正の数乗しかできません");
 			let v = Math.pow(par1.value, par2.value);
 			if(isFinite(v)) return new FloatValue(v, this.loc);
-			else throw new RuntimeError(this.first_line, "オーバーフローしました");
+			else throw new RuntimeError(loc.first_line, "オーバーフローしました");
 		}
+		else throw new RuntimeError(loc.first_line, "powerは数値にしか使えません");
 	}),
 	"length": new DefinedFunction(1, function(param, loc){
 		var par1 = param[0].getValue();
-		if(par1 instanceof NullValue) return new IntValue(0, this.loc);
-		else if(par1 instanceof StringValue) return new IntValue(par1.value.length(), this.loc);
+		if(par1 instanceof StringValue) return new IntValue(par1.value.length, this.loc);
 		else if(par1 instanceof ArrayValue) return new IntValue(par1.length, this.loc);
-		else throw new RuntimeError(this.first_line, func + "は文字列と配列にしか使えません");
+		else throw new RuntimeError(loc.first_line, "lengthは文字列と配列にしか使えません");
 	}),
 	"substring": new DefinedFunction([2,3], function(param, loc){
 		var par1 = param[0].getValue();
 		var par2 = param[1].getValue();
 		var par3 = param.length == 3 ? param[2].getValue() : null;
-		if((par1 instanceof NullValue || par1 instanceof StringValue) &&
-			(par2 instanceof NullValue || par2 instanceof IntValue) &&
-			(par3 == null || par1 instanceof NullValue || par3 instanceof IntValue))
+		if(par1 instanceof StringValue &&
+			par2 instanceof IntValue &&
+			(par3 == null || par3 instanceof IntValue))
 		{
 			var v;
 			if(par3 == null) v = par1.value.substr(par2.value);
 			else v = par1.value.substr(par2.value, par3.value);
 			return new StringValue(v, this.loc);
 		}
-		else throw new RuntimeError(this.first_line, func + "の引数の型が違います");
+		else throw new RuntimeError(loc.first_line, "substringの引数の型が違います");
 	}),
 	"append": new DefinedFunction(2, function(param, loc){
 		var par1 = param[0].getValue();
 		var par2 = param[1].getValue();
-		if(par1 instanceof NullValue) return par2;
-		else if(par2 instanceof NullValue) return par1;
-		else if(par2 instanceof StringValue && par2 instanceof StringValue)
+		if(par2 instanceof StringValue && par2 instanceof StringValue)
 		{
 			return new StringValue(par1.value + par2.value, this.loc);
 		}
-		else throw new RuntimeError(this.first_line, func + "の引数の型が違います");
+		else throw new RuntimeError(loc.first_line, "appendの引数の型が違います");
+	}),
+	"split": new DefinedFunction(2, function(param, loc){
+		var par1 = param[0].getValue();
+		var par2 = param[1].getValue();
+		if(par1 instanceof StringValue && par2 instanceof StringValue)
+		{
+			var v1 = par1.value;
+			var v2 = par2.value;
+			var v = v1.split(v2);
+			var vr = [];
+			for(var i = 0; i < v.length; i++) vr.push(new StringValue(v[i], this.loc));
+			return new ArrayValue(vr, this.loc);
+		}
+		else throw new RuntimeError(loc.first_line, "splitの引数の型が違います");
 	}),
 	"extract": new DefinedFunction(3, function(param, loc){
 		var par1 = param[0].getValue();
 		var par2 = param[1].getValue();
 		var par3 = param[2].getValue();
-		if((par1 instanceof NullValue || par1 instanceof StringValue) &&
-			(par2 instanceof NullValue || par2 instanceof StringValue) &&
-			(par3 instanceof NullValue || par3 instanceof IntValue))
+		if(par1 instanceof StringValue && par2 instanceof StringValue && par3 instanceof IntValue)
 		{
-			var v1 = par1 instanceof NullValue ? '' : par1.value;
-			var v2 = par2 instanceof NullValue ? '' : par2.value;
+			var v1 = par1.value;
+			var v2 = par2.value;
 			var v3 = par3.value;
 			var v = v1.split(v2);
 			if(v3 >= 0 && v3 < v.length) return new StringValue(v[v3], this.loc);
-			else throw new RuntimeError(this.first_line, "番号の値が不正です");
+			else throw new RuntimeError(loc.first_line, "番号の値が不正です");
 		}
-		else throw new RuntimeError(this.first_line, func + "の引数の型が違います");
+		else throw new RuntimeError(loc.first_line, "extractの引数の型が違います");
 	}),
 	"insert": new DefinedFunction(3, function(param, loc){
 		var par1 = param[0].getValue();
 		var par2 = param[1].getValue();
 		var par3 = param[2].getValue();
-		if((par1 instanceof NullValue || par1 instanceof StringValue) &&
-			(par2 instanceof NullValue || par2 instanceof IntValue) &&
-			(par3 instanceof NullValue || par3 instanceof StringValue))
+		if(par1 instanceof StringValue && par2 instanceof IntValue && par3 instanceof StringValue)
 		{
-			var v1 = par1 instanceof NullValue ? '' : par1.value;
+			var v1 = par1.value;
 			var v2 = par2.value;
-			var v3 = par3 instanceof NullValue ? '' : par3.value;
-			if(v2 < 0 || v2 > v1.length) throw new RuntimeError(this.first_line, "位置の値が不正です");
+			var v3 = par3.value;
+			if(v2 < 0 || v2 > v1.length) throw new RuntimeError(loc.first_line, "位置の値が不正です");
 			var s1 = v1.substr(0, v2);
 			var s2 = v1.substr(v2);
 			return new StringValue(s1 + v3 + s2, this.loc);
 		}
-		else throw new RuntimeError(this.first_line, func + "の引数の型が違います");
+		else throw new RuntimeError(loc.first_line, "insertの引数の型が違います");
 	}),
 	"replace": new DefinedFunction(4, function(param, loc){
 		var par1 = param[0].getValue();
 		var par2 = param[1].getValue();
 		var par3 = param[2].getValue();
 		var par4 = param[3].getValue();
-		if((par1 instanceof NullValue || par1 instanceof StringValue) &&
-			(par2 instanceof NullValue || par2 instanceof IntValue) &&
-			(par3 instanceof NullValue || par3 instanceof IntValue) &&
-			(par4 instanceof NullValue || par4 instanceof StringValue))
+		if(par1 instanceof StringValue && par2 instanceof IntValue && par3 instanceof IntValue && par4 instanceof StringValue)
 		{
-			var v1 = par1 instanceof NullValue ? '' : par1.value;
+			var v1 = par1.value;
 			var v2 = par2.value;
 			var v3 = par3.value;
-			var v4 = par4 instanceof NullValue ? '' : par4.value;
+			var v4 = par4.value;
 
-			if(v2 < 0 || v2 > v1.length) throw new RuntimeError(this.first_line, "位置の値が不正です");
-			if(v3 < 0 || v2 + v3 > v1.length)throw new RuntimeError(this.first_line, "長さの値が不正です");
+			if(v2 < 0 || v2 > v1.length) throw new RuntimeError(loc.first_line, "位置の値が不正です");
+			if(v3 < 0 || v2 + v3 > v1.length)throw new RuntimeError(loc.first_line, "長さの値が不正です");
 			var s1 = v1.substr(0, v2);
 			var s2 = v1.substr(v2 + v3);
 			return new StringValue(s1 + v4 + s2, this.loc);
 		}
-		else throw new RuntimeError(this.first_line, func + "の引数の型が違います");
+		else throw new RuntimeError(loc.first_line, "replaceの引数の型が違います");
 	})
 };
+
+function setCaller(statementlist, caller)
+{
+	for(let i = 0; i < statementlist.length; i++)
+	{
+		if(statementlist[i].statementlist) setCaller(statementlist[i].statementlist, caller);
+		if(statementlist[i].state) setCaller(statementlist[i].state, caller);
+		if(statementlist[i].state1) setCaller(statementlist[i].state1, caller);
+		if(statementlist[i].state2) setCaller(statementlist[i].state2, caller);
+		if(statementlist[i] instanceof ReturnStatement) statementlist[i].setCaller(caller, true);
+	}
+}
+
+
+function cloneStatementlist(statementlist)
+{
+	var rtnv = [];
+	for(let i = 0; i < statementlist.length; i++) rtnv.push(statementlist[i].clone());
+	return rtnv;
+}
 
 /**
  * 関数呼び出し
  */
-class CallFunction extends Value
-{
-	/**
-	 * @constructor
-	 * @param {string} funcname 
-	 * @param {Array<string>} parameter 
-	 * @param {Location} loc 
-	 */
-	constructor(funcname, parameter, loc)
-	{
-		super({funcname: funcname, parameter:parameter}, loc);
-//		this.rtnv = new StringValue("関数が終了していません", loc);
-	}
-	run()
-	{
-		const func = this.value.funcname, param = this.value.parameter;
-		if(definedFunction[func])
-		{
-			super.run();
-			returnValues.push(definedFunction[func].exec(param, this.loc));
-		}
-		else if(myFuncs[func])
-		{
-			let index = code[0].stack[0].index;
-			let fn = myFuncs[func];
-			let vt = new varTable();
-			for(let i = 0; i < fn.params.length; i++)
-			{
-				vt.vars[fn.params[i].varname] = param[i].getValue().clone();
-			}
-			let statementlist = fn.statementlist.concat();
-			statementlist.push(new notReturnedFunction(fn.loc));
-			let pf = new parsedFunction(statementlist);
-			code.unshift(pf);
-			varTables.unshift(vt);
-			code[1].stack[0].index = index + 1;
-		}
-		else
-			throw new RuntimeError(this.first_line, '関数 '+func+' は定義されていません');
-	}
-	getValue()
-	{
-		return returnValues.pop();
-	}
-	getCode()
-	{
-		let func = this.value.funcname, param = this.value.parameter;
-		let ag = [];
-		for(let i = 0; i < param.length; i++)
-			ag.push(param[i].getCode());
-		return func + '(' + ag.join(',') + ')';
-	}
-}
-
-class Append extends Value
-{
-	constructor(x,y,loc){super([x,y],loc);}
-	run()
-	{
-		let v1, v2;
-		if(this.value[0].getValue() instanceof NullValue) v1 = '';
-		else if(this.value[0].getValue() instanceof ArrayValue) v1 = array2text(this.value[0].getValue());
-		else v1 = String(this.value[0].getValue().value);
-		if(this.value[1].getValue() instanceof NullValue) v2 = '';
-		else if(this.value[1].getValue() instanceof ArrayValue) v2 = array2text(this.value[1].getValue());
-		else v2 = String(this.value[1].getValue().value);
-		let v = v1 + v2;
-		this.rtnv = new StringValue(v, this.loc);
-		code[0].stack[0].index++;
-	}
-	getCode()
-	{
-		return this.value[0].getCode() + " と " + this.value[1].getCode();
-	}
-}
-
+ class CallFunction extends Value
+ {
+	 /**
+	  * @constructor
+	  * @param {string} funcname 
+	  * @param {Array<Value>} parameter 
+	  * @param {Location} loc 
+	  */
+	 constructor(funcname, parameter, loc)
+	 {
+		 super([funcname, parameter], loc);
+		 this.rtnv = null;
+		 this.state = 0;
+	 }
+	 clone()
+	 {
+		 var rtnv = new CallFunction(this.value[0], this.value[1], this.loc);
+		 rtnv.rtnv = this.rtnv;
+		 return rtnv;
+	 }
+	 run()
+	 {
+		 if(this.state == 0)
+		 {
+			 code[0].stack.unshift({statementlist: this.value[1], index: 0});
+			 this.state = 1;
+		 }
+		 else if(this.state == 1)
+		 {
+			 code[0].stack[0].index++;
+			 const func = this.value[0], param = this.value[1];
+			 if(definedFunction[func])
+			 {
+				 let fn = definedFunction[func].clone();
+				 fn.setCaller(this);
+				 fn.setParameter(param);
+				 fn.setLocation(this.loc);
+				 let statementlist = [fn];
+				 code.unshift(new parsedFunction(statementlist));
+			 }
+			 else if(myFuncs[func])
+			 {
+				 let fn = myFuncs[func];
+				 let vt = new varTable();
+				 let globalVarTable = varTables[varTables.length - 1];
+				 for(let i of Object.keys(globalVarTable.vars)) vt.vars[i] = globalVarTable.vars[i].getValue().clone();
+				 for(let i = 0; i < fn.params.length; i++) vt.vars[fn.params[i].varname] = param[i].getValue().clone();
+				 let statementlist = cloneStatementlist(fn.statementlist);
+				 setCaller(statementlist, this);
+				 statementlist.push(new notReturnedFunction(fn.loc));
+				 let pf = new parsedFunction(statementlist);
+				 code.unshift(pf);
+				 varTables.unshift(vt);
+			 }
+			 else
+				 throw new RuntimeError(this.first_line, '関数 '+func+' は定義されていません');
+			 this.state = 0;
+		 }
+	 }
+	 setValue(v)
+	 {
+		 this.rtnv = v.clone();
+	 }
+	 getValue()
+	 {
+		 return this.rtnv;
+	 }
+	 getCode()
+	 {
+		 let func = this.value[0], param = this.value[1];
+		 let ag = [];
+		 for(let i = 0; i < param.length; i++)
+			 ag.push(param[i].getCode());
+		 return func + '(' + ag.join(',') + ')';
+	 }
+ }
+ 
+ class Connect extends Value
+ {
+	 constructor(x,y,loc)
+	 {
+		 super([x,y],loc);
+		 this.state = 0;
+	 }
+	 clone()
+	 {
+		 var rtnv = new Connect(this.value[0].clone(), this.value[1].clone(), this.loc);
+		 rtnv.rtnv = this.rtnv;
+		 return rtnv;
+	 }
+	 run()
+	 {
+		 if(this.state == 0)
+		 {
+			 code[0].stack.unshift({statementlist: this.value, index: 0});
+			 this.state = 1;
+		 }
+		 else
+		 {
+			 code[0].stack[0].index++;
+			 let v1 = array2text(this.value[0].getValue());
+			 let v2 = array2text(this.value[1].getValue());
+			 let v = v1 + v2;
+			 this.rtnv = new StringValue(v, this.loc);
+			 this.state = 0;
+		 }
+	 }
+	 getCode()
+	 {
+		 return this.value[0].getCode() + "と" + this.value[1].getCode();
+	 }
+	 getValue()
+	 {
+		 return this.rtnv;
+	 }
+ }
+ 
+ class SliceValue extends Value
+ {
+	 constructor(x,y,loc)
+	 {
+		 super([x,y],loc);
+		 this.state = 0;
+	 }
+	 clone()
+	 {
+		 var rtnv = new SliceValue(this.value[0].clone(), this.value[1].clone(), this.loc);
+		 rtnv.rtnv = this.rtnv;
+		 return rtnv;
+	 }
+	 run()
+	 {
+		 if(this.state == 0)
+		 {
+			 code[0].stack.unshift({statementlist: this.value, index: 0});
+			 this.state = 1;
+		 }
+		 else
+		 {
+			 code[0].stack[0].index++;
+			 this.state = 0;
+		 }
+	 }
+	 getCode()
+	 {
+		 return this.value[0].getCode() + ":" + this.value[1].getCode();
+	 }
+	 getValue()
+	 {
+		 return this;
+	 }
+	 getValue1()
+	 {
+		 return this.value[0];
+	 }
+	 getValue2()
+	 {
+		 return this.value[1];
+	 }
+ }
+ 
 /**
  * 命令クラス
  */
-class Statement
-{
-	/**
-	 * @constructor
-	 * @param {Location} loc 
-	 */
-	constructor(loc)
-	{
-		this._loc = loc;
-	}
-	get first_line() {return this._loc.first_line;}
-	get last_line() {return this._loc.last_line;}
-	get loc(){return this._loc;}
-	run(){code[0].stack[0].index++;}
-}
-
+ class Statement
+ {
+	 /**
+	  * @constructor
+	  * @param {Location} loc 
+	  */
+	 constructor(loc)
+	 {
+		 this._loc = loc;
+		 this.state = 0;
+	 }
+	 get first_line() {return this._loc.first_line;}
+	 get last_line() {return this._loc.last_line;}
+	 get loc(){return this._loc;}
+	 run(){throw new RuntimeError(this.first_line, "これを呼んではいけない");}
+	 /**
+	  * 
+	  * @param {number} indent 
+	  */
+	 clone()
+	 {
+		 throw new RuntimeError(this.first_line, constructor_name(this) + "はcloneが作られていません");
+	 }
+ }
+ 
 /**
  * 手続き定義クラス
  */
-class DefineStep extends Statement {
+ class DefineStep extends Statement {
 	/**
 	 * @constructor
 	 * @param {string} funcName 
@@ -1453,59 +2743,83 @@ class DefineStep extends Statement {
     	if (myFuncs[funcName]) throw new RuntimeError(this.first_line, '手続き '+funcName+' と同名の関数、または手続きが既に定義されています');
 		this.params = params;
 		this.statementlist = statementlist;
+		this.funcName = funcName;
 		myFuncs[funcName] = this;
+	}
+	run()
+	{
+		code[0].stack[0].index++;
 	}
 }
 
 /**
  * 手続き呼び出しが終わった後の処理
  */
-class afterCallStep
-{
-	run()
-	{
-		varTables.shift();
-		code.shift();
-	}
-}
-
+ class afterCallStep
+ {
+	 run()
+	 {
+		 varTables.shift();
+		 code.shift();
+	 }
+ }
+ 
 /**
  * 手続き呼び出し
  */
-class CallStep extends Statement {
-  	constructor(funcName, args, loc) {
-    	super(loc);
-    	this.funcName = funcName;
-    	this.args = args;
-  	}
- 	run() {
-		code[0].stack[0].index++;
-		const fn = this.funcName
-		const args = this.args;
-		if(myFuncs[fn])
-		{
-			let vt = new varTable();
-			for(let i = 0; i < myFuncs[fn].params.length; i++)
-				vt.vars[myFuncs[fn].params[i].varname] = args[i].getValue().clone();
-			let statementlist = myFuncs[fn].statementlist.concat();
-			// TODO 呼ばれる保証がない
-			statementlist.push(new afterCallStep());
-			code.unshift(new parsedStep(statementlist));
-			varTables.unshift(vt);
-		}
-		else
-			throw new RuntimeError(this.first_line, '手続き '+fn+' は定義されていません');
-  	}
+ class CallStep extends Statement {
+	constructor(funcName, args, loc) {
+	  super(loc);
+	  this.funcName = funcName;
+	  this.args = args;
+  }
+  clone()
+  {
+	  return new CallStep(this.funcName, this.args.clone(), this.loc);
+  }  
+   run() {
+	  if(this.state == 0)
+	  {
+		  code[0].stack.unshift({statementlist: this.args, index: 0});
+		  this.state = 1;
+	  }
+	  else
+	  {
+		  code[0].stack[0].index++;
+		  const fn = this.funcName
+		  const args = this.args;
+		  if(myFuncs[fn])
+		  {
+			  let vt = new varTable();
+			  let globalVarTable = varTables[varTables.length - 1];
+			  for(let i of Object.keys(globalVarTable.vars))
+				  vt.vars[i] = globalVarTable.vars[i].getValue().clone();
+			  for(let i = 0; i < myFuncs[fn].params.length; i++)
+				  vt.vars[myFuncs[fn].params[i].varname] = args[i].getValue().clone();
+			  let statementlist = myFuncs[fn].statementlist.concat();
+			  // TODO 呼ばれる保証がない
+			  statementlist.push(new afterCallStep());
+			  code.unshift(new parsedStep(statementlist));
+			  varTables.unshift(vt);
+		  }
+		  else
+			  throw new RuntimeError(this.first_line, '手続き '+fn+' は定義されていません');
+		  this.state = 0;
+	  }
+  }
 }
 
 class ExitStatement extends Statement {
 	constructor(loc) {
  		super(loc);
-  	}
+	}
+	clone()
+	{
+		return new ExitStatement(this.loc);
+	}
 	run() {
 		if(code[0] instanceof parsedStep)
 		{
-//			code[0].stack[0].index = -1;
 			code.shift();
 			varTables.shift();
 		}
@@ -1519,32 +2833,61 @@ class DefineFunction extends Statement {
 		if (definedFunction[funcName]) throw new RuntimeError(this.first_line, '関数 '+funcName+' と同名の標準関数が存在します');
 		if (myFuncs[funcName]) throw new RuntimeError(this.first_line, '関数 '+funcName+' と同名の関数、または手続きが既に定義されています');
 		this.params = params;
+		this.funcName = funcName;
 		myFuncs[funcName] = this;
 		this.statementlist = statementlist;
 	}
+	clone()
+	{
+		throw new RuntimeError(this.first_line, 'これはクローンされるべきでない');
+	}
 	run() {
-		super.run();
+		code[0].stack[0].index++;
 	}
 }
 
 /**
  * 関数から値を返す
  */
-class ReturnStatement extends Statement {
+ class ReturnStatement extends Statement {
 	constructor(value, loc) {
 		super(loc);
-		this.value = value;
+		this.value = value.clone();
+		this.caller = null;
+		this.flag = false;
+		this.state = 0;
 	}
-	run() {
-		if(code[0] instanceof parsedFunction)
+	clone()
+	{
+		let rtnv = new ReturnStatement(this.value.clone(), this.loc);
+		rtnv.caller  = this.caller;
+		rtnv.flag  = this.flag;
+		return rtnv;
+	}
+	setCaller(caller, flag)
+	{
+		this.caller = caller;
+		this.flag = flag;
+	}
+	run()
+	{
+		if(this.state == 0)
 		{
-//			this.value.getValue().run();
-			returnValues.push(this.value.getValue());
-			code.shift();
-			varTables.shift();
-//			super.run();
+			code[0].stack.unshift({statementlist: [this.value], index: 0});
+			this.state = 1;
 		}
-		else throw new RuntimeError(this.first_line, "関数の中ではありません");
+		else
+		{
+			code[0].stack[0].index++;
+			if(code[0] instanceof parsedFunction)
+			{
+				this.caller.setValue(this.value.getValue());
+				code.shift();
+				if(this.flag) varTables.shift();
+			}
+			else throw new RuntimeError(this.first_line, "関数の中ではありません");
+			this.state = 0;
+		}
 	}
 }
 
@@ -1556,223 +2899,32 @@ class notReturnedFunction extends Statement {
 	}
 }
 
+function dump()
+{
+	textareaAppend("*** 変数確認 ***\n");
+	var vars = varTables[0].varnames([]);
+	if(varTables.length > 1) vars = varTables[varTables.length - 1].varnames(vars);
+	for(var i = 0; i < vars.length; i++)
+	{
+		if(vars[i][0] == '!') continue;
+		let vartable = findVarTable(vars[i]);
+		let v = vartable.vars[vars[i]];
+		textareaAppend(vars[i] + ":" + array2code(v) + "\n");
+	}
+}
+
 
 class DumpStatement extends Statement
 {
 	constructor(loc){super(loc);}
-	run()
+	clone()
 	{
-		textareaAppend("*** 変数確認 ***\n");
-		var vars = varTables[0].varnames([]);
-		if(varTables.length > 1) vars = varTables[varTables.length - 1].varnames(vars);
-		for(var i = 0; i < vars.length; i++)
-		{
-			let vartable = findVarTable(vars[i]);
-			let v = vartable.vars[vars[i]];
-			textareaAppend(vars[i] + ":" + array2code(v) + "\n");
-		}
-		super.run();
-	}
-}
-
-
-/**
- * ValueのArrayをcode[0].stackに積む
- * @param {Array<Value>|ArrayValue} args 
- * @param {Array} queue
- */
-function valuelist2stack(args, queue)
-{
-	if(args instanceof Array)
-	{
-		for(let i = 0; i < args.length; i++)
-		{
-			let v = args[i];
-			if(v instanceof ArrayValue) valuelist2stack(v.value, queue);
-			else if(v instanceof Variable && v.args) valuelist2stack(v.args, queue);
-			else if(v && !(v instanceof Variable) && v.value instanceof Array) valuelist2stack(v.value, queue);
-			else if(v instanceof CallFunction) valuelist2stack(v.value.parameter, queue);
-			queue.push(v);
-		}
-	}
-	else if(args instanceof ArrayValue)
-	{
-		for(let i = 0; i < args.length; i++)
-		{
-			let v = args.nthValue(i);
-			if(v instanceof ArrayValue) valuelist2stack(v.value, queue);
-			else if(v instanceof Variable && v.args) valuelist2stack(v.args, queue);
-			else if(v && !(v instanceof Variable) && v.value instanceof Array) valuelist2stack(v.value, queue);
-			else if(v instanceof CallFunction) valuelist2stack(v.value.parameter, queue);
-			queue.push(v);
-		}
-	}
-	else queue.push(v);
-}
-
-class runBeforeGetValue extends Statement
-{
-	/**
-	 * @constructor
-	 * @param {Array<Value>} args 
-	 * @param {Location} loc 
-	 */
-	constructor(args, loc)
-	{
-		super(loc);
-		this.args = args;
+		return new DumpStatement(this.loc);
 	}
 	run()
 	{
-		super.run();
-		let queue = [];
-		valuelist2stack(this.args, queue);
-		code[0].stack.unshift({statementlist:queue, index: 0});
-	}
-}
-
-class runArgsBeforeGetValue extends Statement
-{
-	/**
-	 * @constructor
-	 * @param {Array<Value>} args 
-	 * @param {Location} loc 
-	 */
-	constructor(args, loc)
-	{
-		super(loc);
-		this.args = args;
-	}
-	run()
-	{
-		super.run();
-		let queue = [];
-		for(let i = 0; i < this.args.length; i++)
-		{
-			if(this.args[i].parameter) valuelist2stack(this.args[i].parameter, queue);
-			if(this.args[i].args) valuelist2stack(this.args[i].args, queue);
-		}
-		code[0].stack.unshift({statementlist: queue, index: 0});
-	}
-}
-
-/**
- * 変数定義クラスの親クラス
- */
-class DefinitionStatement extends Statement {
-	constructor(loc) {
-		super(loc);
-	}
-	getCode() {
-		var ag = [];
-		for(var i = 0; i < this.vars.length; i++)
-		{
-			var vn = this.vars[i].varname;
-			var pm = this.vars[i].parameter;
-			if(pm)
-			{
-				var pl = [];
-				for(var j = 0; j < pm.length; j++) pl.push(pm.nthValue(j).getCode());
-				vn += '[' + pl.join(',') + ']';
-			}
-			ag.push(vn);
-		}
-		return ag.join(',');
-	}
-}
-class DefinitionInt extends DefinitionStatement
-{
-	constructor(x, loc)
-	{
-		super(loc);
-		this.vars = x;
-	}
-	run()
-	{
-		super.run();
-		for(var i = 0; i < this.vars.length; i++)
-		{
-			if(this.vars[i] instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
-			
-			let varname = this.vars[i].varname;
-			let parameter = this.vars[i].parameter;
-			let v = varTables[0].findVarTable(varname);
-			if(v) throw new RuntimeError(this.first_line, varname + "の宣言が重複しています");
-			if(!parameter) varTables[0].vars[varname] = new IntValue(0, this.loc);
-			else varTables[0].vars[varname] = makeArray(parameter, [], this.loc, typeOfValue.typeInt);
-		}
-	}
-}
-class DefinitionFloat extends DefinitionStatement
-{
-	constructor(x, loc)
-	{
-		super(loc);
-		this.vars = x;
-	}
-	run()
-	{
-		super.run();
-		for(var i = 0; i < this.vars.length; i++)
-		{
-			if(this.vars[i] instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
-			
-			let varname = this.vars[i].varname;
-			let parameter = this.vars[i].parameter;
-			let v = varTables[0].findVarTable(varname);
-			if(v) throw new RuntimeError(this.first_line, varname + "の宣言が重複しています");
-			if(!parameter) varTables[0].vars[varname] = new FloatValue(0.0, this.loc);
-			else varTables[0].vars[varname] = makeArray(parameter, [], this.loc, typeOfValue.typeFloat);
-		}
-	}
-}
-class DefinitionString extends DefinitionStatement
-{
-	constructor(x, loc)
-	{
-		super(loc);
-		this.vars = x;
-	}
-	run()
-	{
-		super.run();
-		for(var i = 0; i < this.vars.length; i++)
-		{
-			if(this.vars[i] instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
-			
-			let varname = this.vars[i].varname;
-			let parameter = this.vars[i].parameter;
-			let v = varTables[0].findVarTable(varname);
-			if(v) throw new RuntimeError(this.first_line, varname + "の宣言が重複しています");
-			if(!parameter) varTables[0].vars[varname] = new StringValue('', this.loc);
-			else varTables[0].vars[varname] = makeArray(parameter, [], this.loc, typeOfValue.typeString);
-		}
-	}
-}
-class DefinitionBoolean extends DefinitionStatement
-{
-	constructor(x, loc)
-	{
-		super(loc);
-		this.vars = x;
-	}
-	run()
-	{
-		super.run();
-		for(var i = 0; i < this.vars.length; i++)
-		{
-			for(var i = 0; i < this.vars.length; i++)
-			{
-				if(this.vars[i] instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
-				
-				let varname = this.vars[i].varname;
-				let parameter = this.vars[i].parameter;
-				let v = varTables[0].findVarTable(varname);
-				if(v) throw new RuntimeError(this.first_line, varname + "の宣言が重複しています");
-				if(!parameter) varTables[0].vars[varname] = new BooleanValue(true, this.loc);
-				else varTables[0].vars[varname] = makeArray(parameter, [], this.loc, typeOfValue.typeBoolean);
-			}
-		}
+		dump();
+		code[0].stack[0].index++;
 	}
 }
 
@@ -1798,172 +2950,420 @@ class Assign extends Statement
 	 * @constructor
 	 * @param {Variable} variable 
 	 * @param {Value} value 
+	 * @param {String} operator
+	 * @param {Location} loc
+	 */
+	constructor(variable,value, operator, loc)
+	{
+		super(loc);
+		if(!(variable instanceof Variable || variable instanceof UNDEFINED)) throw new RuntimeError(loc.first_line, "変数でないものに代入はできません");
+		this.variable = variable;
+		this.value = value;
+		this.operator = operator;
+		this.state = 0;
+	}
+	clone()
+	{
+		return new Assign(this.variable.clone(), this.value.clone(),this.operator, this.loc);
+	}
+	run()
+	{
+		if(this.variable instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
+		if(this.state == 0)
+		{
+			let a=[];
+			if(this.operator) a.push(this.variable);
+			else if(this.variable.args) a = a.concat(this.variable.args.value);
+			a.push(this.value);
+			code[0].stack.unshift({statementlist: a, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let vn = this.variable.varname;
+			let ag = this.variable.args;
+			let vl = this.value.getValue();
+			let vt = findVarTable(vn);
+			if(vt) // 変数が定義されている
+			{
+				let va = vt.vars[vn];
+				if(this.operator)
+				{
+					va = getValueByArgs(va, ag ? ag.value : null, this.loc);
+					let v1 = va.getValue(), v2 = vl, v3 = null;
+					switch(this.operator)
+					{
+					case '+':
+						if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+						if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+						if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の足し算はまだサポートしていません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書の足し算はまだサポートしていません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) v3 = new StringValue(String(v1.value) + String(v2.value), this.loc);
+						else if(v1 instanceof IntValue && v2 instanceof IntValue) v3 = new IntValue(v1.value + v2.value, this.loc);
+						else if(v1 instanceof FloatValue || v2 instanceof FloatValue) v3 = new FloatValue(v1.value + v2.value, this.loc);
+						break;
+					case '-':
+						if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+						if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+						if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の引き算はできません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書の引き算はできません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列の引き算はできません");
+						else if(v1 instanceof IntValue && v2 instanceof IntValue) v3 = new IntValue(v1.value - v2.value, this.loc);
+						else if(v1 instanceof FloatValue || v2 instanceof FloatValue) v3 = new FloatValue(v1.value - v2.value, this.loc);
+						break;
+					case '*':
+						if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+						if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+						if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の掛け算は出来ません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書の掛け算はできません");
+						else if(v1 instanceof StringValue)
+						{
+							if(v2 instanceof IntValue) v3 = new StringValue(v1.value.repeat(v2.value >= 0 ? v2.value : 0), this.loc);
+							else throw new RuntimeError(this.first_line, "文字列に掛けられるのは整数だけです")
+						}
+						else if(v1 instanceof IntValue && v2 instanceof IntValue) v3 = new IntValue(v1.value * v2.value, this.loc);
+						else if(v1 instanceof FloatValue || v2 instanceof FloatValue) v3 = new FloatValue(v1.value * v2.value, this.loc);
+						break;
+					case '/':
+						if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+						if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+						if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の割り算はできません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書の割り算はできません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列の割り算はできません");
+						else
+						{
+							if(v2.value == 0) throw new RuntimeError(this.first_line, '0で割り算をしました');
+							else v3 = new FloatValue(v1.value / v2.value, this.loc);
+						}
+						break;
+					case '//':
+						if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+						if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+						if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の割り算はできません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書の割り算はできません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列の割り算はできません");
+						else
+						{
+							if(v2.value == 0) throw new RuntimeError(this.first_line, '0で割り算をしました');
+							let v4 = Math.floor(v1.value / v2.value);
+							if(v1 instanceof IntValue && v2 instanceof IntValue ) v3 = new IntValue(v4, this.loc);
+							else v3 = new FloatValue(v4, this.loc);
+						}
+						break;
+					case '%':
+						if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+						if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+						if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の割り算はできません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書の割り算はできません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列の割り算はできません");
+						else
+						{
+							if(v2.value == 0) throw new RuntimeError(this.first_line, '0で割り算をしました');
+							let v4 = v1.value - Math.floor(v1.value / v2.value) * v2.value;
+							if(v1 instanceof IntValue && v2 instanceof IntValue ) v3 = new IntValue(v4, this.loc);
+							else v3 = new FloatValue(v4, this.loc);
+						}
+						break;
+					case '&':
+						if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のビット積はできません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書のビット積はできません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のビット積はできません");
+						else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数のビット積はできません");
+						else if(v1 instanceof BooleanValue && v2 instanceof BooleanValue) v3 = new BooleanValue(v1.value && v2.value, this.loc);
+						else
+						{
+							if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+							if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+							v3 = new IntValue(v1.value & v2.value, this.loc);
+						} 
+						break;
+					case '|':
+						if(v1 instanceof ArrayValue || v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のビット和はできません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書のビット和はできません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のビット和はできません");
+						else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数のビット和はできません");
+						else if(v1 instanceof BooleanValue && v2 instanceof BooleanValue) v3 = new BooleanValue(v1.value && v2.value, this.loc);
+						else
+						{
+							if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+							if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+							v3 = new IntValue(v1.value | v2.value, this.loc);
+						} 
+						break;
+					case '^':
+						if(v1 instanceof ArrayValue && v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列の排他的論理和はできません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書の排他的論理和はできません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列の排他的論理和はできません");
+						else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数の排他的論理和はできません");
+						else if(v1 instanceof BooleanValue && v2 instanceof BooleanValue) v3 = new BooleanValue(v1.value && v2.value, this.loc);
+						else
+						{
+							if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+							if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+							v3 = new IntValue(v1.value ^ v2.value, this.loc);
+						} 
+						break;
+					case '<<':
+						if(v1 instanceof ArrayValue && v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のビットシフトはできません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書のビットシフトはできません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のビットシフトはできません");
+						else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数のビットシフトはできません");
+						else if(v1 instanceof BooleanValue && v2 instanceof BooleanValue) v3 = new BooleanValue(v1.value && v2.value, this.loc);
+						else
+						{
+							if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+							if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+							v3 = new IntValue(v1.value << v2.value, this.loc);
+						} 
+						break;
+					case '>>':
+						if(v1 instanceof ArrayValue && v2 instanceof ArrayValue) throw new RuntimeError(this.first_line, "配列のビットシフトはできません");
+						else if(v1 instanceof DictionaryValue || v2 instanceof DictionaryValue) throw new RuntimeError(this.first_line, "辞書のビットシフトはできません");
+						else if(v1 instanceof StringValue || v2 instanceof StringValue) throw new RuntimeError(this.first_line, "文字列のビットシフトはできません");
+						else if(v1 instanceof FloatValue || v2 instanceof FloatValue) throw new RuntimeError(this.first_line, "実数のビットシフトはできません");
+						else if(v1 instanceof BooleanValue && v2 instanceof BooleanValue) v3 = new BooleanValue(v1.value && v2.value, this.loc);
+						else
+						{
+							if(v1 instanceof BooleanValue) v1 = new IntValue(v1.value ? 1 : 0, this.loc);
+							if(v2 instanceof BooleanValue) v2 = new IntValue(v2.value ? 1 : 0, this.loc);
+							v3 = new IntValue(v1.value >> v2.value, this.loc);
+						} 
+						break;
+					}
+					if(!v3) throw new RuntimeError(this.first_line, '複合代入演算子の使い方が間違っています');
+					setVariableByArgs(vt,vn, ag ? ag.value : null, v3, this.loc);
+				}
+				else setVariableByArgs(vt, vn, ag ? ag.value : null, vl.clone(), this.loc);
+			}
+			else // 変数が定義されていない
+			{
+				if(this.operator) throw new RuntimeError(this.first_line, '宣言されていない変数に複合代入演算子が使われました');
+				vt = varTables[0];
+				vt.vars[vn] = new NullValue(this.loc);
+				setVariableByArgs(vt, vn, ag ? ag.value : null, vl.clone(), this.loc);
+			}
+			this.state = 0;
+		}
+	}
+}
+
+class Append extends Statement
+{
+	/**
+	 * @constructor
+	 * @param {Variable} variable 
+	 * @param {Value} value 
 	 * @param {Location} loc 
 	 */
 	constructor(variable,value,loc)
 	{
 		super(loc);
+		if(!(variable instanceof Variable || variable instanceof UNDEFINED))throw new RuntimeError(loc.first_line, "追加されるものは変数でなくてはいけません");
 		this.variable = variable;
 		this.value = value;
+		this.state = 0;
+	}
+	clone()
+	{
+		return new Append(this.variable.clone(), this.value.clone(), this.loc);
 	}
 	run()
 	{
 		if(this.variable instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: [this.variable, this.value], index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let vn = this.variable.varname;
+			let ag = this.variable.args;
+			let vl = this.value.getValue();
+			let vt = findVarTable(vn);
+			if(vt) // 変数が定義されている
+			{
+				let va = vt.vars[vn];
+				if(ag && ag.value.length > 0) // 配列の添字がある
+				{
+					for(let i = 0; i < ag.value.length; i++) 
+					{
+						if(ag.value[i].getValue() instanceof StringValue)
+						{
+							va = va.value[ag.value[i].getValue().value];
+						}
+						else if(ag.value[i].getValue() instanceof IntValue)
+						{
+							if(va.value[ag.value[i].getValue().value])
+								va = va.value[ag.value[i].getValue().value];
+							else throw new RuntimeError(this.first_line, '配列の範囲を超えたところに追加しようとしました')
+						}
+						else throw new RuntimeError(this.first_line, '添字に使えないデータ型です');
+					}
+				}
+				if(va instanceof ArrayValue) va.value.push(vl.clone());
+				else throw new RuntimeError(this.first_line, '配列でない変数に追加はできません');
+			}
+			else // 変数が定義されていない
+				throw new RuntimeError(this.first_line, '存在しない配列に追加はできません');
+			this.state = 0;
+		}
+	}
+}
 
-		let index = code[0].stack[0].index;	// 内部でrun()を呼び出すところがあるので，super.run()を呼んではいけない
+class Extend extends Statement
+{
+	/**
+	 * @constructor
+	 * @param {Variable} variable 
+	 * @param {Value} value 
+	 * @param {Location} loc 
+	 */
+	constructor(variable,value,loc)
+	{
+		super(loc);
+		if(!(variable instanceof Variable || variable instanceof UNDEFINED))throw new RuntimeError(loc.first_line, "連結されるものは変数でなくてはいけません");
+		this.variable = variable;
+		this.value = value;
+	}
+	clone()
+	{
+		return new Extend(this.variable.clone(), this.value.clone(), this.loc);
+	}
+	run()
+	{
+		code[0].stack[0].index++;
+		if(this.variable instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
+
 		let vn = this.variable.varname;
 		let ag = this.variable.args;
 		let vl = this.value.getValue();
 		let vt = findVarTable(vn);
-
 		if(vt) // 変数が定義されている
 		{
 			let va = vt.vars[vn];
-			if(ag) // 配列の添字がある
+			if(ag && ag.value.length > 0) // 配列の添字がある
+			{
 				for(let i = 0; i < ag.value.length; i++) 
 				{
-					if(ag.value[i].getValue().value < (setting.array_origin == 2 ? 1 : 0)) throw new RuntimeError(this.first_line,vn + argsString(ag) + "には代入できません");
-					if(va.nthValue(ag.value[i].getValue().value + setting.array_origin == 2 ? 1 : 0))
-						va = va.nthValue(ag.value[i].getValue().value+ setting.array_origin == 2 ? 1 : 0);
-					else
+					ag.value[i].run();
+					if(ag.value[i] instanceof StringValue)
 					{
-						if(setting.var_declaration == 0) throw new RuntimeError(this.first_line, vn + argsString(ag) + "には代入できません");
-						// 配列を延長する
-						if(i < ag.value.length - 1) va = new ArrayValue([], this.loc);
-						else va = new NullValue(this.loc);
-					}
-				}
-			if(va.getValue() instanceof IntValue)
-			{
-				let v = 0;
-				if(vl instanceof IntValue) v = vl.value;
-				else if(vl instanceof FloatValue) v = Math.floor(vl.value);
-				else throw new RuntimeError(this.first_line, vn + argsString(this.variable.args) + "に数値以外の値を代入しようとしました");
-				if(!isSafeInteger(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
-				if(ag)	vt.vars[vn].setValueToArray(ag, new IntValue(v, this.loc));
-				else vt.vars[vn] = new IntValue(v, this.loc);
-			}
-			else if(va.getValue() instanceof FloatValue)
-			{
-				let v = 0.0;
-				if(vl instanceof IntValue || vl instanceof FloatValue) v = vl.value + 0.0;
-				else throw new RuntimeError(this.first_line, vn + argsString(this.variable.args) + "に数値以外の値を代入しようとしました");
-				if(!isFinite(v)) throw new RuntimeError(this.first_line, "オーバーフローしました");
-				if(ag)	vt.vars[vn].setValueToArray(ag, new FloatValue(v, this.loc));
-				else vt.vars[vn] = new FloatValue(v, this.loc);
-			}
-			else if(va.getValue() instanceof StringValue)
-			{
-				let v = '';
-				if(vl instanceof StringValue) v = vl.value;
-				else v = text(vl.value);
-				if(ag)	vt.vars[vn].setValueToArray(ag, new StringValue(v, this.loc));
-				else vt.vars[vn] = new StringValue(v, this.loc);
-			}
-			else if(va.getValue() instanceof BooleanValue)
-			{
-				let v;
-				if(vl instanceof BooleanValue) v = vl.value;
-				else throw new RuntimeError(this.first_line, vn + argsString(this.variable.args) + "に真偽以外の値を代入しようとしました");
-				if(ag)	vt.vars[vn].setValueToArray(ag, new BooleanValue(v, this.loc));
-				else vt.vars[vn] = new BooleanValue(v, this.loc);
-			}
-			else if(va.getValue() instanceof ArrayValue)
-			{
-				if(vl.value instanceof Array)
-				{
-					var len = vl.value.length;
-					for(var i = 0; i < len; i++)
+						va = va.value[ag.value[i].getValue().value];					}
+					else if(ag.value[i] instanceof IntValue)
 					{
-						var ag1 = this.variable.args instanceof ArrayValue ? this.variable.args.value.slice() : [];
-						ag1.push(new IntValue(i + (setting.array_origin == 2 ? 1 : 0), this.loc));
-						var command = new Assign(new Variable(this.variable.varname, new ArrayValue(ag1, this.loc), this.loc),vl.value[i], this.loc);
-						command.run();
+						if(va.value[ag.value[i].getValue().value])
+							va = va.value[ag.value[i].getValue().value];
+						else throw new RuntimeError(this.first_line, '配列の範囲を超えたところに連結しようとしました')
 					}
+					else throw new RuntimeError(this.first_line, "添字に使えないデータ型です");
 				}
-				else throw new RuntimeError(this.first_line, "配列" + vn + argsString(this.variable.args) + "に配列以外の値を代入しようとしました");
 			}
-			else if(va.getValue() instanceof NullValue)
+			if(va instanceof ArrayValue)
 			{
-				if(ag)
+				if(vl instanceof ArrayValue)
 				{
-					if(vl instanceof IntValue)vt.vars[vn].setValueToArray(ag, new IntValue(vl.value, this.loc));
-					else if(vl instanceof FloatValue)vt.vars[vn].setValueToArray(ag, new FloatValue(vl.value, this.loc));
-					else if(vl instanceof StringValue)vt.vars[vn].setValueToArray(ag, new StringValue(vl.value, this.loc));
-					else if(vl instanceof BooleanValue)vt.vars[vn].setValueToArray(ag, new BooleanValue(vl.value, this.loc));
+					var l = vl.value.length;
+					for(var i = 0; i < l; i++) va.value.push(vl.value[i].clone());
 				}
-				else
-				{
-					if(vl instanceof IntValue) vt.vars[vn] = new IntValue(vl.value, this.loc);
-					else if(vl instanceof FloatValue) vt.vars[vn] = new FloatValue(vl.value, this.loc);
-					else if(vl instanceof StringValue) vt.vars[vn] = new StringValue(vl.value, this.loc);
-					else if(vl instanceof BooleanValue) vt.vars[vn] = new BooleanValue(vl.value, this.loc);
-				}
-			}
+				else throw new RuntimeError(this.first_line, '配列でない値を連結することはできません');
+			} 
+			else throw new RuntimeError(this.first_line, '配列でない変数に連結はできません');
 		}
 		else // 変数が定義されていない
-		{
-			if(setting.var_declaration == 0) throw new RuntimeError(this.first_line, vn + "は宣言されていません");
-			else // 新しい変数を宣言する
-			{
-				vt = varTables[0];
-				if(ag)
-				{
-					if(vl instanceof IntValue)vt.vars[vn].setValueToArray(ag, new IntValue(vl.value, this.loc));
-					else if(vl instanceof FloatValue)vt.vars[vn].setValueToArray(ag, new FloatValue(vl.value, this.loc));
-					else if(vl instanceof StringValue)vt.vars[vn].setValueToArray(ag, new StringValue(vl.value, this.loc));
-					else if(vl instanceof BooleanValue)vt.vars[vn].setValueToArray(ag, new BooleanValue(vl.value, this.loc));
-				}
-				else
-				{
-					if(vl instanceof IntValue) vt.vars[vn] = new IntValue(vl.value, this.loc);
-					else if(vl instanceof FloatValue) vt.vars[vn] = new FloatValue(vl.value, this.loc);
-					else if(vl instanceof StringValue) vt.vars[vn] = new StringValue(vl.value, this.loc);
-					else if(vl instanceof BooleanValue) vt.vars[vn] = new BooleanValue(vl.value, this.loc);
-				}
-			}
-		}
-		code[0].stack[0].index = index + 1;
+			throw new RuntimeError(this.first_line, '存在しない配列に連結はできません');
 	}
 }
 
 class Input extends Statement
 {
-	constructor(x, loc)
+	constructor(x, type,loc)
 	{
 		super(loc);
+		if(!(x instanceof Variable || x instanceof UNDEFINED))throw new RuntimeError(loc.first_line, "入力されるものは変数でなくてはいけません");
 		this.varname = x;
+		this.type = type;
+		this.state = 0;
+	}
+	clone()
+	{
+		return new Input(this.varname.clone(), this.type, this.loc);
 	}
 	run()
 	{
 		if(selected_quiz < 0)	// 通常時
 		{
+			code[0].stack[0].index++;
 			if(this.varname instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
-			var list = [new InputBegin(this.loc), new InputEnd(this.varname, this.loc)];
-			code.unshift(new parsedCode(list));
+			var list = [new InputBegin(this.loc), new InputEnd(this.varname, this.type, this.loc)];
+			code[0].stack.unshift({statementlist: list, index: 0});
 		}
 		else	// 自動採点時
 		{
-			if(selected_quiz_input < Quizzes[selected_quiz].inputs(selected_quiz_case).length)
+			if(this.state == 0)
 			{
-				let index = code[0].stack[0].index;
-				if(this.varname instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
-				let va = new Variable(this.varname.varname, this.varname.args, this.loc);
-				let vl = Quizzes[selected_quiz].inputs(selected_quiz_case)[selected_quiz_input++];
-				va.run();
-				let v0 = va.getValue();
-				let assign = null;
-				let re = /真|true/i;
-				if(v0 instanceof IntValue)assign = new Assign(va, new IntValue(Number(toHalf(vl, this.loc)), this.loc), this.loc);
-				else if(v0 instanceof FloatValue)assign = new Assign(va, new FloatValue(Number(toHalf(vl, this.loc)), this.loc), this.loc);
-				else if(v0 instanceof StringValue) assign = new Assign(va, new StringValue(vl + '', this.loc), this.loc);
-				else if(v0 instanceof BooleanValue) assign = new Assign(va, new BooleanValue(re.exec(vl) != null, this.loc), this.loc);
-				else if(v0 instanceof NullValue) assign = new Assign(va, new StringValue(vl + '', this.loc), this.loc);
-				assign.run();
-				code[0].stack[0].index = index + 1;
+				if(this.varname.args) code[0].stack.unshift({statementlist: this.varname.args, index: 0});
+				this.state = 1;
 			}
-			else throw new RuntimeError(this.first_line, '必要以上の入力を求めています。');
+			else
+			{
+				code[0].stack[0].index++;
+				if(selected_quiz_input < Quizzes[selected_quiz].inputs(selected_quiz_case).length)
+				{
+					if(this.varname instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
+					let va = new Variable(this.varname.varname, this.varname.args, this.loc);
+					let vl = Quizzes[selected_quiz].inputs(selected_quiz_case)[selected_quiz_input++];
+					// va.run();
+					let assign = null;
+					let re = /^(0+|false|偽|)$/i;
+					if(this.type == typeOfValue.typeInt)assign = new Assign(this.varname, new IntValue(Number(toHalf(vl, this.loc)), this.loc),null, this.loc);
+					else if(this.type == typeOfValue.typeFloat)assign = new Assign(this.varname, new FloatValue(Number(toHalf(vl, this.loc)), this.loc), null, this.loc);
+					else if(this.type == typeOfValue.typeString) assign = new Assign(this.varname, new StringValue(vl + '', this.loc), null, this.loc);
+					else if(this.type == typeOfValue.typeBoolean) assign = new Assign(this.varname, new BooleanValue(!re.exec(vl), this.loc), null, this.loc);
+					code[0].stack.unshift({statementlist: [assign], index: 0});
+				}
+				else throw new RuntimeError(this.first_line, '必要以上の入力を求めています。');
+				this.state = 0;
+			}
 		}
+	}
+}
+function openInputWindow()
+{
+	setRunflag(false);
+	setEditableflag(false);
+	var input_area = document.getElementById("input_area");
+	input_area.value = '';
+	input_area.readOnly = false;
+	input_area.focus();
+	document.getElementById("input_status").style.visibility = 'visible';
+	document.getElementById("sourceTextarea").readOnly = true;
+	// editor.options.readOnly = true;
+	// editor.getWrapperElement().classList.add("readonly");
+}
+
+function closeInputWindow()
+{
+	var val = document.getElementById("input_area").value;
+	document.getElementById("input_area").readOnly = true;
+	document.getElementById("input_status").style.visibility = 'hidden';
+	return val;
+}
+
+function keydownInput(e)
+{
+	var evt = e || window.event
+	if(evt.keyCode == 13)
+	{
+		setRunflag(true);
+		step();
+	}
+	else if(evt.keyCode == 27)
+	{
+		closeInputWindow();
+		code.shift();
 	}
 }
 
@@ -1977,10 +3377,14 @@ class InputBegin extends Statement
 	{
 		super(loc);
 	}
+	clone()
+	{
+		return new InputBegin(this.loc);
+	}
 	run()
 	{
 		openInputWindow();
-		super.run();
+		code[0].stack[0].index++;
 	}
 }
 
@@ -1988,39 +3392,49 @@ class InputEnd extends Statement
 {
 	/**
 	 * @constructor
-	 * @param {Variable} x 
+	 * @param {Variable} x
+	 * @param {typeOfValue} type 
 	 * @param {Location} loc 
 	 */
-	constructor(x, loc)
+	constructor(x, type, loc)
 	{
 		super(loc);
 		this.varname = x;
+		this.type = type;
+		this.state = 0;
+	}
+	clone()
+	{
+		return new InputEnd(this.varname.clone(), this.type, this.loc);
 	}
 	run()
 	{
 		if(this.varname instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
-		try{
-			let va = new Variable(this.varname.varname, this.varname.args, this.loc);
-			let vl = closeInputWindow();
-			va.run();
-			let v0 = va.getValue();
-			let assign = null;
-			let re = /真|true/i;
-			code.shift();
-			let index = code[0].stack[0].index;
-			if(v0 instanceof IntValue)assign = new Assign(va, new IntValue(Number(toHalf(vl, this.loc)), this.loc), this.loc);
-			else if(v0 instanceof FloatValue)assign = new Assign(va, new FloatValue(Number(toHalf(vl, this.loc)), this.loc), this.loc);
-			else if(v0 instanceof StringValue) assign = new Assign(va, new StringValue(vl + '', this.loc), this.loc);
-			else if(v0 instanceof BooleanValue) assign = new Assign(va, new BooleanValue(re.exec(vl) != null, this.loc), this.loc);
-			else if(v0 instanceof NullValue) assign = new Assign(va, new StringValue(vl + '', this.loc), this.loc);
-			assign.run();
-			code[0].stack[0].index = index + 1;
-		}
-		catch(e)
+		if(this.state == 0)
 		{
-			closeInputWindow();
-			code.shift();
-			throw e;
+			if(this.varname.args) code[0].stack.unshift({statementlist:this.varname.args, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			try{
+				let vl = closeInputWindow();
+				// va.run();
+				let assign = null;
+				let re = /^(0+|false|偽|)$/i;
+				if(this.type == typeOfValue.typeInt)assign = new Assign(this.varname, new IntValue(Number(toHalf(vl, this.loc)), this.loc), null, this.loc);
+				else if(this.type == typeOfValue.typeFloat)assign = new Assign(this.varname, new FloatValue(Number(toHalf(vl, this.loc)), this.loc), null, this.loc);
+				else if(this.type == typeOfValue.typeString) assign = new Assign(this.varname, new StringValue(vl + '', this.loc), null, this.loc);
+				else if(this.type == typeOfValue.typeBoolean) assign = new Assign(this.varname, new BooleanValue(!re.exec(vl), this.loc), null, this.loc);
+				code[0].stack.unshift({statementlist: [assign], index: 0});
+			}
+			catch(e)
+			{
+				closeInputWindow();
+				throw e;
+			}
+			this.state = 0;
 		}
 	}
 }
@@ -2028,8 +3442,13 @@ class InputEnd extends Statement
 class Newline extends Statement
 {
 	constructor(loc){super(loc);}
+	clone()
+	{
+		return new Newline(this.loc);
+	}
 	run()
 	{
+		code[0].stack[0].index++;
 		if(selected_quiz < 0)
 		{
 			textareaAppend("\n");
@@ -2038,16 +3457,14 @@ class Newline extends Statement
 		{
 			output_str += "\n";
 		}
-		super.run();
-	}	
+	}
 }
-
 
 class Output extends Statement
 {
 	/**
 	 * 
-	 * @param {Value} x 
+	 * @param {Array<Value>} x 
 	 * @param {boolean} ln 
 	 * @param {Location} loc 
 	 */
@@ -2056,48 +3473,91 @@ class Output extends Statement
 		super(loc);
 		this.value = x;
 		this.ln = ln;
+		this.state = 0;
+	}
+	clone()
+	{
+		var val = [];
+		for(var i = 0; i < this.value.length; i++) val.push(this.value[i].clone());
+		return new Output(val, this.ln, this.loc);
 	}
 	run()
 	{
-		let index = code[0].stack[0].index;
-		//this.value.run();
-		let v = this.value.getValue();
-		if(selected_quiz < 0)
+		if(this.state == 0)
 		{
-			textareaAppend(array2text(v) + (this.ln ? "\n" : ""));
+			code[0].stack.unshift({statementlist: this.value, index: 0});
+			this.state = 1;
 		}
 		else
 		{
-			output_str += array2text(v) + (this.ln ? "\n" : "");
+			code[0].stack[0].index++;
+			let s = '';
+			for(var i = 0; i < this.value.length; i++)
+			{
+				let v = this.value[i];
+				s += (i > 0 ? ' ' : '') + array2text(v);
+			}
+			if(this.ln)	s += '\n';
+			if(selected_quiz < 0) textareaAppend(s);
+			else output_str += s;
+			this.state = 0;
 		}
-		code[0].stack[0].index = index + 1;
 	}
 }
 
 function array2text(v)
 {
-	if(v instanceof NullValue || !v) return '';
-	let v0 = v.getValue();
-	if(v0 instanceof ArrayValue)
+	if(!v) return '';
+	if(v instanceof Value)
 	{
-		let v1 = [];
-		for(let i = setting.array_origin == 2 ? 1 : 0; i < v0.value.length; i++) v1.push(array2text(v0.nthValue(i)));
-		return '[' + v1.join(',') + ']';
+		let v0 = v.getValue();
+		if(v0 instanceof ArrayValue)
+		{
+			let v1 = [];
+			for(let i = 0; i < v0.value.length; i++)
+			{
+				v1.push(array2text(v0.value[i]));
+			}
+			return '[' + v1.join(',') + ']';
+		}
+		else if(v0 instanceof DictionaryValue)
+		{
+			let v1 = [];
+			let keys = Object.keys(v0.value);
+			keys.sort();
+			for(let i = 0; i < keys.length; i++) 
+			{
+				v1.push(keys[i] + ':' + array2text(v0.value[keys[i]]));
+			}
+			return '{' + v1.join(',') + '}';
+		}
+		else if(v0 instanceof BooleanValue) return v0.value ? 'True' : 'False';
+		else if(v0 instanceof FloatValue && isInteger(v0.value) && !v0.value.toString().match(/[Ee]/)) return v0.value + '.0';
+		else return new String(v0.value);
 	}
-	return v0.value;
+	else return new String(v);
 }
 
 function array2code(v)
 {
-	if(v instanceof NullValue || !v) return '';
+	if(!v) return '';
 	let v0 = v.getValue();
 	if(v0 instanceof ArrayValue)
 	{
 		let v1 = [];
-		for(let i = setting.array_origin == 2 ? 1 : 0; i < v0.value.length; i++) v1.push(array2text(v0.nthValue(i)));
+		for(let i = 0; i < v0.value.length; i++) v1.push(array2text(v0.value[i]));
 		return '[' + v1.join(',') + ']';
 	}
-	else if(v0 instanceof StringValue) return "「" + v0.value + "」";
+	else if(v0 instanceof DictionaryValue)
+	{
+		let v1 = [];
+		let keys = Object.keys(v0.value);
+		keys.sort();
+		for(let i = 0; i < keys.length; i++) v1.push(keys[i] + ':' + array2text(v0.value[keys[i]]));
+		return '{' + v1.join(',') + '}';
+	}
+	else if(v0 instanceof StringValue) return '"' + v0.value + '"';
+	else if(v0 instanceof FloatValue && isInteger(v0.value) && !v0.value.toString().match(/[Ee]/)) return v0.value + '.0';
 	return v0.value;
 }
 
@@ -2108,215 +3568,461 @@ class GraphicStatement extends Statement
 		super(loc);
 		this.command = command;
 		this.args = args;
+		this.state = 0;
+	}
+	clone()
+	{
+		var args = [];
+		for(var i = 0; i < this.args.length; i++) args.push(this.args[i].clone());
+		return new GraphicStatement(this.command, args, this.loc);
 	}
 	run()
 	{
-		super.run();
-		if(this.command == 'gOpenWindow')
+		if(this.state == 0)
 		{
-			var canvas = document.getElementById('canvas');
-			context = canvas.getContext('2d');
-			canvas.setAttribute("width", this.args[0].getValue().value + "px");
-			canvas.setAttribute("height", this.args[1].getValue().value + "px");
-			canvas.style.display="block";
-			context.fillStyle = "rgba(255,255,255,1)";
-			context.fillRect(0, 0, canvas.width, canvas.height);
-			context.strokeStyle = "rgba(0,0,0,1)";
-			context.fillStyle = "rgba(0,0,0,1)";
-		}
-		else if(this.command == 'gCloseWindow')
-		{
-			var canvas = document.getElementById('canvas');
-			canvas.style.display = "none";
-			context = null;
-		}
-		else if(this.command == 'gClearWindow')
-		{
-			var canvas = document.getElementById('canvas');
-			context.fillStyle = "rgba(255,255,255,1)";
-			context.fillRect(0, 0, canvas.width, canvas.height);
-			context.strokeStyle = "rgba(0,0,0,1)";
-			context.fillStyle = "rgba(0,0,0,1)";
-		}
-		else if(this.command == 'gSetLineColor')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let r = this.args[0].getValue().value, g = this.args[1].getValue().value, b = this.args[2].getValue().value;
-			context.strokeStyle = "rgba(" + r + "," + g + "," + b + ",1)";
-		}
-		else if(this.command == 'gSetFillColor')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let r = this.args[0].getValue().value, g = this.args[1].getValue().value, b = this.args[2].getValue().value;
-			context.fillStyle = "rgba(" + r + "," + g + "," + b + ",1)";
-		}
-		else if(this.command == 'gSetTextColor')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let r = this.args[0].getValue().value, g = this.args[1].getValue().value, b = this.args[2].getValue().value;
-			context.textStyle = "rgba(" + r + "," + g + "," + b + ",1)";	// ?
-		}
-		else if(this.command == 'gSetLineWidth')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			context.lineWidth = this.args[0].getValue().value;
-		}
-		else if(this.command == 'gSetFontSize')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			context.font = this.args[0].getValue().value + "px 'sans-serif'";
-		}
-		else if(this.command == 'gDrawText')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			var temp = context.fillStyle;
-			context.fillStyle = context.textStyle;
-			context.fillText(this.args[0].getValue().value, this.args[1].getValue().value, this.args[2].getValue().value);
-			context.fillStyle = temp;
-		}
-		else if(this.command == 'gDrawPoint')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value;
-			context.beginPath();
-			context.arc(x1, y1, 1, 0, Math.PI * 2, false);
-			context.stroke();
-		}
-		else if(this.command == 'gDrawLine')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value,
-				x2 = this.args[2].getValue().value, y2 = this.args[3].getValue().value;
-			context.beginPath();
-			context.moveTo(x1, y1);
-			context.lineTo(x2, y2);
-			context.stroke();
-		}
-		else if(this.command == 'gDrawBox')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value,
-				width = this.args[2].getValue().value, height = this.args[3].getValue().value;
-			context.beginPath();
-			context.strokeRect(x1, y1, width, height);
-			context.stroke();
-		}
-		else if(this.command == 'gFillBox')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value,
-				width = this.args[2].getValue().value, height = this.args[3].getValue().value;
-			context.fillRect(x1, y1, width, height);
-			context.beginPath();
-			context.strokeRect(x1, y1, width, height);
-			context.fill();
-		}
-		else if(this.command == 'gDrawCircle')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value, r = this.args[2].getValue().value;
-			context.beginPath();
-			context.arc(x1, y1, r, 0, Math.PI * 2, false);
-			context.stroke();
-		}
-		else if(this.command == 'gFillCircle')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value, r = this.args[2].getValue().value;
-			context.beginPath();
-			context.arc(x1, y1, r, 0, Math.PI * 2, false);
-			context.fill();
-			context.beginPath();
-			context.arc(x1, y1, r, 0, Math.PI * 2, false);
-			context.stroke();
-		}
-		else if(this.command == 'gDrawOval')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x = this.args[0].getValue().value, y = this.args[1].getValue().value, w = this.args[2].getValue().value, h = this.args[3].getValue().value;
-			context.beginPath();
-			context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-			context.stroke();
-		}
-		else if(this.command == 'gFillOval')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x = this.args[0].getValue().value, y = this.args[1].getValue().value, w = this.args[2].getValue().value, h = this.args[3].getValue().value;
-			context.beginPath();
-			context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-			context.fill();
-			context.beginPath();
-			context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-			context.stroke();
-		}
-		else if(this.command == 'gDrawArc')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x = this.args[0].getValue().value, y = this.args[1].getValue().value, w = this.args[2].getValue().value, h = this.args[3].getValue().value,
-				theta1 = this.args[4].getValue().value, theta2 = this.args[5].getValue().value, type = this.args[6].getValue().value;
-			context.beginPath();
-			context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, -theta1 * Math.PI / 180,  -theta2 * Math.PI / 180, true);
-			if(type == 2)	// 半径
-			{
-				context.lineTo(x + w / 2, y + h / 2);
-				context.closePath();
-			}
-			else if(type == 1)	// 弦
-			{
-				context.closePath();
-			}
-			context.stroke();
-		}
-		else if(this.command == 'gFillArc')
-		{
-			if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
-			let x = this.args[0].getValue().value, y = this.args[1].getValue().value, w = this.args[2].getValue().value, h = this.args[3].getValue().value,
-				theta1 = this.args[4].getValue().value, theta2 = this.args[5].getValue().value, type = this.args[6].getValue().value;
-			for(var i = 0; i < 2; i++)
-			{
-				context.beginPath();
-				context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, -theta1 * Math.PI / 180,  -theta2 * Math.PI / 180, true);
-				if(type == 2)	// 半径
-				{
-					context.lineTo(x + w / 2, y + h / 2);
-					context.closePath();
-				}
-				else if(type == 1)	// 弦
-				{
-					context.closePath();
-				}
-				if(i == 0) context.fill();
-				else context.stroke();
-			}
+			if(this.args) code[0].stack.unshift({statementlist: this.args, index: 0});
+			this.state = 1;
 		}
 		else
 		{
-			throw new RuntimeError(this.first_line, "未実装のコマンド" + this.command + "が使われました");
+			code[0].stack[0].index++;
+			if(this.command == 'gOpenWindow')
+			{
+				var canvas = document.getElementById('canvas');
+				context = canvas.getContext('2d');
+				canvas.setAttribute("width", this.args[0].getValue().value + "px");
+				canvas.setAttribute("height", this.args[1].getValue().value + "px");
+				canvas.style.display="block";
+			}
+			else if(this.command == 'gCloseWindow')
+			{
+				var canvas = document.getElementById('canvas');
+				canvas.style.display = "none";
+				context = null;
+			}
+			else if(this.command == 'gClearWindow')
+			{
+				var canvas = document.getElementById('canvas');
+				context.clearRect(0,0,canvas.width, canvas.height)
+			}
+			else if(this.command == 'gSetLineColor')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let r = this.args[0].getValue().value, g = this.args[1].getValue().value, b = this.args[2].getValue().value;
+				context.strokeStyle = "rgb(" + r + "," + g + "," + b + ")";
+			}
+			else if(this.command == 'gSetFillColor')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let r = this.args[0].getValue().value, g = this.args[1].getValue().value, b = this.args[2].getValue().value;
+				context.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+			}
+			else if(this.command == 'gSetTextColor')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let r = this.args[0].getValue().value, g = this.args[1].getValue().value, b = this.args[2].getValue().value;
+				context.textStyle = "rgb(" + r + "," + g + "," + b + ")";
+			}
+			else if(this.command == 'gSetLineWidth')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				context.lineWidth = this.args[0].getValue().value;
+			}
+			else if(this.command == 'gSetFontSize')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				context.font = this.args[0].getValue().value + "px 'sans-serif'";
+			}
+			else if(this.command == 'gDrawText')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				var temp = context.fillStyle;
+				context.fillStyle = context.textStyle;
+				context.fillText(this.args[0].getValue().value, this.args[1].getValue().value, this.args[2].getValue().value);
+				context.fillStyle = temp;
+			}
+			else if(this.command == 'gDrawLine')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value,
+					x2 = this.args[2].getValue().value, y2 = this.args[3].getValue().value;
+				context.beginPath();
+				context.moveTo(x1, y1);
+				context.lineTo(x2, y2);
+				context.stroke();
+			}
+			else if(this.command == 'gDrawPoint')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value;
+				context.beginPath();
+				context.arc(x1, y1, 1, 0, Math.PI * 2, false);
+				context.stroke();
+			}
+			else if(this.command == 'gDrawBox')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value,
+					width = this.args[2].getValue().value, height = this.args[3].getValue().value;
+				context.beginPath();
+				context.strokeRect(x1, y1, width, height);
+				context.stroke();
+			}
+			else if(this.command == 'gFillBox')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value,
+					width = this.args[2].getValue().value, height = this.args[3].getValue().value;
+				context.fillRect(x1, y1, width, height);
+				context.beginPath();
+				context.strokeRect(x1, y1, width, height);
+				context.stroke();
+			}
+			else if(this.command == 'gDrawCircle')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value, r = this.args[2].getValue().value;
+				context.beginPath();
+				context.arc(x1, y1, r, 0, Math.PI * 2, false);
+				context.stroke();
+			}
+			else if(this.command == 'gFillCircle')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value, r = this.args[2].getValue().value;
+				for(var i = 0; i < 2; i++)
+				{
+					context.beginPath();
+					context.arc(x1, y1, r, 0, Math.PI * 2, false);
+					if(i == 0) context.fill();
+					else context.stroke();
+				}
+			}
+			else if(this.command == 'gDrawOval')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value, w = this.args[2].getValue().value, h = this.args[3].getValue().value;
+				context.beginPath();
+				context.ellipse(x1 + w / 2, y1 + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+				context.stroke();
+			}
+			else if(this.command == 'gFillOval')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value, w = this.args[2].getValue().value, h = this.args[3].getValue().value;
+				for(var i = 0; i < 2; i++)
+				{
+					context.beginPath();
+					context.ellipse(x1 + w / 2, y1 + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+					if(i == 0) context.fill();
+					else context.stroke();
+				}
+			}
+			else if(this.command == 'gDrawArc')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value, w = this.args[2].getValue().value, h = this.args[3].getValue().value,
+					theta1 = this.args[4].getValue().value, theta2 = this.args[5].getValue().value, style = this.args[6].getValue().value;
+				context.beginPath();
+				context.ellipse(x1 + w / 2, y1 + h / 2, w / 2, h / 2, 0, -theta1 * Math.PI / 180, -theta2 * Math.PI / 180, true);
+				switch(style)
+				{
+					case 2: // 半径
+						context.lineTo(x1 + w / 2, y1 + h / 2);
+						// fall through
+					case 1: // 弦
+						context.closePath();
+				}
+				context.stroke();
+			}
+			else if(this.command == 'gFillArc')
+			{
+				if(context == null) throw new RuntimeError(this.first_line, "描画領域がありません");
+				let x1 = this.args[0].getValue().value, y1 = this.args[1].getValue().value, w = this.args[2].getValue().value, h = this.args[3].getValue().value,
+					theta1 = this.args[4].getValue().value, theta2 = this.args[5].getValue().value, style = this.args[6].getValue().value;
+				for(var i = 0; i < 2; i++)
+				{
+					context.beginPath();
+					context.ellipse(x1 + w / 2, y1 + h / 2, w / 2, h / 2, 0, -theta1 * Math.PI / 180, -theta2 * Math.PI / 180, true);
+					switch(style)
+					{
+						case 2: // 半径
+							context.lineTo(x1 + w / 2, y1 + h / 2);
+							// fall through
+						case 1: // 弦
+							context.closePath();
+					}
+					if(i == 0) context.fill();
+					else context.stroke();
+				}
+			}
+			else if(this.command == 'gBarplot')
+			{
+				if(context == null)
+				{
+					var canvas = document.getElementById('canvas');
+					var w = this.args[0].getValue().value, h = this.args[1].getValue().value;
+					context = canvas.getContext('2d');
+					canvas.setAttribute("width", w + "px");
+					canvas.setAttribute("height", h + "px");
+					canvas.style.display="block";
+				}
+				// 値の取得
+				var values = array2values(this.args[2], this.loc);
+				var max = 0, min = 0, maxn = 0;
+				for(var i = 0; i < values.length; i++)
+				{
+					var l = values[i].length;
+					if(l > maxn) maxn = l;
+					for(var j = 0; j < l; j++)
+					{
+						var v1 = values[i][j];
+						if(v1 > max) max = v1;
+						if(v1 < min) min = v1;
+					}
+				}
+				if(max == 0) max = 1;
+				// 軸の描画
+				var x0 = w * 0.05, y0 = h * 0.95;
+				y0 *= max / (max - min);
+				w *= 0.9; h *= 0.9;
+				context.beginPath();
+				context.moveTo(x0, y0 - h * max / (max - min));
+				context.lineTo(x0, y0 - h * min / (max - min));
+				context.moveTo(x0, y0);
+				context.lineTo(x0 + w, y0);
+				context.stroke();
+				if(values.length > 0)
+				{
+					var w0 = w / maxn / values.length;
+					for(var i = 0; i < values.length; i++)
+					{
+						context.fillStyle = graphColor[i % 6];
+						context.beginPath();
+						for(var j = 0; j < values[i].length; j++)
+						{
+							var x = x0 + w0 * j + w0 / 2, y = y0 - (values[i][j] / (max - min)) * h;
+							if(values[i][j] >= 0)
+								context.fillRect(x0 + w0 * j * values.length + w0 * 0.8 * i + w0 * 0.1, y0 - h * (values[i][j] / (max - min)),w0 * 0.8, h * (values[i][j] / (max - min)));
+							else
+								context.fillRect(x0 + w0 * j * values.length + w0 * 0.8 * i + w0 * 0.1, y0, w0 * 0.8, h * (-values[i][j] / (max - min)));
+						}
+						context.stroke();
+					}
+				}
+			}
+			else if(this.command == 'gLineplot')
+			{
+				if(context == null)
+				{
+					var canvas = document.getElementById('canvas');
+					var w = this.args[0].getValue().value, h = this.args[1].getValue().value;
+					context = canvas.getContext('2d');
+					canvas.setAttribute("width", w + "px");
+					canvas.setAttribute("height", h + "px");
+					canvas.style.display="block";	
+				}
+				// 値の取得
+				var values = array2values(this.args[2], this.loc);
+				var max = 0, min = 0, maxn = 0;
+				for(var i = 0; i < values.length; i++)
+				{
+					var l = values[i].length;
+					if(l > maxn) maxn = l;
+					for(var j = 0; j < l; j++)
+					{
+						var v1 = values[i][j];
+						if(v1 > max) max = v1;
+						if(v1 < min) min = v1;
+					}
+				}
+				if(max == 0) max = 1;
+				// 軸の描画
+				var x0 = w * 0.05, y0 = h * 0.95;
+				y0 *= max / (max - min);
+				w *= 0.9; h *= 0.9;
+				context.beginPath();
+				context.moveTo(x0, y0 - h * max / (max - min));
+				context.lineTo(x0, y0 - h * min / (max - min));
+				context.moveTo(x0, y0);
+				context.lineTo(x0 + w, y0);
+				context.stroke();
+				if(values.length > 0)
+				{
+					var w0 = w / maxn;
+					for(var i = 0; i < values.length; i++)
+					{
+						context.strokeStyle = graphColor[i % 6];
+						context.beginPath();
+						for(var j = 0; j < values[i].length; j++)
+						{
+							var x = x0 + w0 * j + w0 / 2, y = y0 - (values[i][j] / (max - min)) * h;
+							if(j == 0) context.moveTo(x, y);
+							else context.lineTo(x, y);
+						}
+						context.stroke();
+					}
+				}
+			}
+			else if(this.command == 'gDrawGraph')
+			{
+				drawGraph(this.args[0].getValue(), this.args[1].getValue(), this.loc);
+			}
+			else if(this.command == 'gClearGraph')
+			{
+				clearGraph();
+			}
+			else
+			{
+				throw new RuntimeError(this.first_line, "未実装のコマンド" + this.command + "が使われました");
+			}
+			this.state = 0;
 		}
 	}
 }
 
-
-class If extends Statement
+function clearGraph()
 {
-	constructor(condition, state1, state2, loc)
-	{
-		super(loc);
-		this.condition = condition;
-		this.state1 = state1;
-		this.state2 = state2;
-	}
-	run()
-	{
-		super.run();
-		if(this.condition.getValue() instanceof BooleanValue)
-		{
-			if(this.condition.getValue().value) code[0].stack.unshift({statementlist: this.state1, index: 0});
-			else if(this.state2 != null) code[0].stack.unshift({statementlist: this.state2, index: 0});
-		}
-		else throw new RuntimeError(this.first_line, "もし〜の構文で条件式が使われていません");
-	}
+	Plotly.purge(document.getElementById("graph"));
 }
+
+// グラフ描画を行う
+// graph{
+//  title: 文字列
+//  x:{
+// 	  title: 文字列
+//    min: 実数
+//    max: 実数
+//  }
+//  y:{
+// 	  title:
+//    min:
+//    max:
+//  }
+// }
+// dataは{
+//   x: 値の配列（省略時は0〜len(y)-1）
+//   y: 値の配列（省略不可）
+//   type: 'bar' or 'line' or 'scatter'
+//   color: 
+//   size: 整数（省略時は1）
+// }の配列
+function drawGraph(layout, data, loc)
+{
+	var div = document.getElementById('graph');
+	var graph_data = [], graph_layout = {};
+	if(layout instanceof DictionaryValue)
+	{
+		for(var key in layout.value)
+		{
+			var val = layout.value[key].getValue();
+			if(val instanceof ArrayValue)
+			{
+				graph_layout[key] = {};
+				for(var key1 in val.value)
+					graph_layout[key][key1] = val2obj(val.value[key1].getValue());
+			}
+			else graph_layout[key] = val2obj(val);
+		}
+	}
+	else if(layout) throw new RuntimeError(loc.first_line, "レイアウト情報が辞書になっていません");
+	if(data instanceof ArrayValue)
+	{
+		var dl = data.value.length;
+		for(var i = 0; i < dl; i++)
+		{
+			var d = data.value[i].getValue();
+			if(d instanceof DictionaryValue)
+			{
+				var va = {};
+				for(var key in d.value)
+				{
+					var val = d.value[key].getValue();
+					va[key] = val2obj(val);
+				}
+				graph_data.push(va);
+	
+			}
+			else throw new RuntimeError(loc.first_line, "データの" + i + "番目の要素が辞書になっていません");
+		}
+	}else throw new RuntimeError(loc.first_line, 'データが配列になっていません');
+	Plotly.newPlot(div, graph_data, graph_layout);
+}
+
+/**
+ * 
+ * @param {ArrayValue} a 
+ * @param {Location} loc 
+ */
+ function array2values(a, loc)
+ {
+	 var rtnv = [];
+	 var array = null;
+	 if(a.rtnv instanceof ArrayValue)
+	 {
+		 if(a.rtnv.value[0] instanceof ArrayValue) array = a.rtnv;
+		 else if(a.rtnv.value instanceof Array) array = new ArrayValue([a.rtnv.value], loc);
+		 else throw new RuntimeError(loc.first_line, "グラフに誤った型が使われています");
+	 }
+	 else if(a.rtnv instanceof Array) array = new ArrayValue(a.rtnv, loc);
+	 else throw new RuntimeError(loc.first_line, "棒グラフ・線グラフには配列が必要です");
+ 
+	 for(var i = 0; i < array.length; i++)
+	 {
+		 var rtnv1 = [];
+		 for(var j = 0; j < array.value[i].length; j++)
+			 rtnv1.push(array.value[i] instanceof ArrayValue ? array.value[i].value[j].value : array.value[i][j].value);
+		 rtnv.push(rtnv1);
+	 }
+	 return rtnv;
+ }
+ 
+ class If extends Statement
+ {
+	 /**
+	  * 
+	  * @param {Value} condition 
+	  * @param {Array<Statement>} state1 
+	  * @param {Array<Statement>} state2 
+	  * @param {Location} loc 
+	  */
+	 constructor(condition, state1, state2, loc)
+	 {
+		 super(loc);
+		 this.condition = condition;
+		 this.state1 = state1;
+		 this.state2 = state2;
+	 }
+	 clone()
+	 {
+		 var state1 = [], state2 = [];
+		 if(this.state1)
+			 for(var i = 0; i < this.state1.length; i++) state1.push(this.state1[i].clone());
+		 if(this.state2)
+			 for(var i = 0; i < this.state2.length; i++) state2.push(this.state2[i].clone());
+		 return new If(this.condition.clone(), state1, state2, this.loc);
+	 }
+	 run()
+	 {
+		 if(this.state == 0)
+		 {
+			 code[0].stack.unshift({statementlist: [this.condition], index: 0});
+			 this.state = 1;
+		 }
+		 else
+		 {
+			 code[0].stack[0].index++;
+			 if(this.condition.getValue() instanceof BooleanValue)
+			 {
+				 if(this.condition.getValue().value) code[0].stack.unshift({statementlist: this.state1, index: 0});
+				 else if(this.state2 && this.state2.length > 0) code[0].stack.unshift({statementlist: this.state2, index: 0});
+			 }
+			 else throw new RuntimeError(this.first_line, "もし〜の構文で条件式が使われていません");
+			 this.state = 0;
+		 }
+	 }
+}
+ 
 class LoopBegin extends Statement
 {
 	/**
@@ -2330,11 +4036,25 @@ class LoopBegin extends Statement
 		super(loc);
 		this.condition = condition;
 		this.continuous = continuous;
+		this.state = 0;
+	}
+	clone()
+	{
+		return new LoopBegin(this.condition.clone(), this.continuous, this.loc);
 	}
 	run()
 	{
-		if(this.condition == null || this.condition.getValue().value == this.continuous) super.run();
-		else code[0].stack[0].index = -1;
+		if(this.state == 0)
+		{
+			if(this.condition) code[0].stack.unshift({statementlist: [this.condition], index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			if(!this.condition || this.condition.getValue().value == this.continuous) code[0].stack[0].index++;
+			else code[0].stack[0].index = -1;
+			this.state = 0;
+		}
 	}
 }
 
@@ -2351,129 +4071,201 @@ class LoopEnd extends Statement
 		super(loc);
 		this.condition = condition;
 		this.continuous = continuous;
+		this.state = 0;
+	}
+	clone()
+	{
+		return new LoopEnd(this.condition.clone(), this.continuous, this.loc);
 	}
 	run()
 	{
-		if(this.condition == null || this.condition.getValue().value == this.continuous) code[0].stack[0].index = 0;
-		else code[0].stack[0].index = -1;
+		if(this.state == 0)
+		{
+			if(this.condition) code[0].stack.unshift({statementlist: [this.condition], index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			if(!this.condition || this.condition.getValue().value == this.continuous) code[0].stack[0].index = 0;
+			else code[0].stack[0].index = -1;
+			this.state = 0;
+		}
 	}
 }
+
+class ForIn extends Statement
+{
+	constructor(array, variable, statementlist, loc)
+	{
+		super(loc);
+		if(!(variable instanceof Variable || variable instanceof UNDEFINED)) throw new RuntimeError(loc.first_line, "繰り返しのカウンタは変数でなくてはいけません");
+		this.array = array;
+		this.variable = variable;
+		this.statementlist = statementlist;
+	}
+	clone()
+	{
+		var state = [];
+		for(var i = 0; i < this.statementlist.length; i++) state.push(this.statementlist[i].clone());
+		return new ForIn(this.array.clone(), this.variable.clone(), state, this.loc);
+	}
+	run()
+	{
+		if(this.varname instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
+		if(this.state == 0)
+		{
+			code[0].stack.unshift({statementlist: [this.array], index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			let variable = new Variable(this.variable.varname, this.variable.args, this.loc);
+			let loop = [new ForIn_step(this, variable, this.array, this.loc), new LoopBegin(new BooleanValue(true, this.loc), true, this.loc)];
+			for(let i = 0; i < this.statementlist.length; i++)loop.push(this.statementlist[i]);
+			loop.push(new LoopEnd(null, true, this.loc));
+			code[0].stack.unshift({statementlist: loop, index: 0});
+			this.state = 0;
+		}
+	}
+}
+
+class ForIn_step extends Statement
+{
+	constructor(forin, variable, array, loc)
+	{
+		super(loc);
+		this.forin = forin;
+		this.variable = variable;
+		this.array = array;
+		this.index = 0;
+	}
+	clone()
+	{
+		return new ForIn_step(this.forin.clone(), this.variable.clone(), this.array.clone(), this.loc);
+	}
+	run()
+	{
+		code[0].stack[0].index++;
+		if(this.index < this.array.rtnv.length)
+		{
+			let assign = new Assign(this.variable, this.array.rtnv.rtnv.value[this.index++], null, this.loc);
+			code[0].stack.unshift({statementlist: [assign], index: 0});
+		}
+		else
+		{
+			code[0].stack[0].statementlist[1] = new LoopBegin(new BooleanValue(false, true, this.loc),true, this.loc);
+		}
+	}
+}
+
 
 /**
  * forループ（加算）
  */
-class ForInc extends Statement
-{
-	/**
-	 * @constructor
-	 * @param {Variable} varname 
-	 * @param {Value} begin 
-	 * @param {Value} end 
-	 * @param {Value} step 
-	 * @param {Array<Statement>} statementlist 
-	 * @param {Location} loc 
-	 */
-	constructor(varname, begin, end, step, statementlist,loc)
-	{
-		super(loc);
-		this.varname = varname;
-		this.begin = begin;
-		this.end = end;
-		this.step = step;
-		this.statementlist = statementlist;
-	}
-	run()
-	{
-		let index = code[0].stack[0].index;
-		if(this.varname instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
-		let last_token = {first_line: this.last_line, last_line: this.last_line};
-		let last_loc = new Location(last_token, last_token);
-		let varTable = findVarTable(this.varname.varname);
-		if(setting.var_declaration != 0 && !varTable)
-		{
-			varTable = varTables[0];
-			if(this.begin.getValue() instanceof IntValue)varTable.vars[this.varname.varname] = new IntValue(0, this.loc);
-			else if(this.begin.getValue() instanceof FloatValue)varTable.vars[this.varname.varname] = new FloatValue(0, this.loc);
-			else varTable = null;
-		}
-		if(varTable)
-		{
-			// ループ前の初期化
-			let assign = new Assign(this.varname, this.begin.getValue(), this.loc);
-			assign.run();
-			// ループ先頭
-			let loop = [];
-			loop.push(new runBeforeGetValue([this.varname.args], this.loc));
-			let variable = new Variable(this.varname.varname, this.varname.args,this.loc);
-			loop.push(new runBeforeGetValue([variable, this.end], this.loc));
-			let condition = new LE(variable, this.end, this.loc);	// IncとDecの違うところ
-			loop.push(new runBeforeGetValue([condition], this.loc));
-			loop.push(new LoopBegin(condition, true, this.loc));
-			for(let i = 0; i < this.statementlist.length; i++)loop.push(this.statementlist[i]);
-			// ループ終端
-			loop.push(new runBeforeGetValue([this.step, this.varname.args], this.loc));
-			let new_counter = new Add(variable, this.step, this.loc);	// IncとDecの違うところ
-			loop.push(new runBeforeGetValue([variable, new_counter], this.loc));
-			loop.push(new Assign(this.varname, new_counter, this.loc));
-			loop.push(new LoopEnd(null, true, last_loc));
-			code[0].stack.unshift({statementlist: loop, index: 0});
-			code[0].stack[1].index = index + 1;
-		}
-		else throw new RuntimeError(this.first_line, this.varname.varname + "は数値型の変数ではありません");
-	}
-}
+ class ForInc extends Statement
+ {
+	 /**
+	  * @constructor
+	  * @param {Variable} varname 
+	  * @param {Value} begin 
+	  * @param {Value} end 
+	  * @param {Value} step 
+	  * @param {Array<Statement>} statementlist 
+	  * @param {Location} loc 
+	  */
+	 constructor(varname, begin, end, step, statementlist,loc)
+	 {
+		 super(loc);
+		 if(!(varname instanceof Variable || varname instanceof UNDEFINED)) throw new RuntimeError(loc.first_line, "繰り返しのカウンタは変数でなくてはいけません");
+		 this.varname = varname;
+		 this.begin = begin;
+		 this.end = end;
+		 this.step = step;
+		 this.statementlist = statementlist;
+		 this.state = 0;
+	 }
+	 clone()
+	 {
+		 var state = [];
+		 for(var i = 0; i < this.statementlist.length; i++) state.push(this.statementlist[i].clone());
+		 return new ForInc(this.varname.clone(), this.begin.clone(), this.end.clone(), this.step.clone(), state, this.loc);
+	 }
+	 run()
+	 {
+		 if(this.varname instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
+		 if(this.state == 0)
+		 {
+			 code[0].stack.unshift({statementlist: [new Assign(this.varname, this.begin, null, this.loc)], index: 0});
+			 this.state = 1;
+		 }
+		 else
+		 {
+			 code[0].stack[0].index++;
+			 if(this.begin.getValue() instanceof IntValue || this.begin.getValue() instanceof FloatValue)
+			 {
+				 let variable = new Variable(this.varname.varname, this.varname.args,this.loc);
+				 let condition = new LE(variable, this.end, this.loc);	// IncとDecの違うところ
+				 let loop = [variable, condition, new LoopBegin(condition, true, this.loc)];
+				 for(let i = 0; i < this.statementlist.length; i++)loop.push(this.statementlist[i]);
+				 loop.push(this.step);
+				 loop.push(new Assign(variable, this.step, '+', this.loc));	// IncとDecの違うところ
+				 loop.push(new LoopEnd(null, true, this.loc));
+				 code[0].stack.unshift({statementlist: loop, index: 0});
+			 }
+			 else throw new RuntimeError(this.first_line, '初期値は数値型である必要があります');
+			 this.state = 0;
+		 }
+	 }
+ }
 
-class ForDec extends Statement
-{
-	constructor(varname, begin, end, step, statementlist,loc)
-	{
-		super(loc);
-		this.varname = varname;
-		this.begin = begin;
-		this.end = end;
-		this.step = step;
-		this.statementlist = statementlist;
-	}
-	run()
-	{
-		if(this.varname instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
-		let last_token = {first_line: this.last_line, last_line: this.last_line};
-		let last_loc = new Location(last_token, last_token);
-		let varTable = findVarTable(this.varname.varname);
-		if(setting.var_declaration != 0 && !varTable)
-		{
-			varTable = varTables[0];
-			if(this.begin.getValue() instanceof IntValue)varTable.vars[this.varname.varname] = new IntValue(0, this.loc);
-			else if(this.begin.getValue() instanceof FloatValue)varTable.vars[this.varname.varname] = new FloatValue(0, this.loc);
-			else varTable = null;
-		}
-		if(varTable)
-		{
-			// ループ前の初期化
-			let assign = new Assign(this.varname, this.begin.getValue(), this.loc);
-			assign.run();
-			// ループ先頭
-			let loop = [];
-			loop.push(new runBeforeGetValue([this.varname.args], this.loc));
-			let variable = new Variable(this.varname.varname, this.varname.args,this.loc);
-			loop.push(new runBeforeGetValue([variable, this.end], this.loc));
-			let condition = new GE(variable, this.end, this.loc);
-			loop.push(new runBeforeGetValue([condition], this.loc));
-			loop.push(new LoopBegin(condition, true, this.loc));
-			for(let i = 0; i < this.statementlist.length; i++)loop.push(this.statementlist[i]);
-			// ループ終端
-			loop.push(new runBeforeGetValue([this.step, this.varname.args], last_loc));
-			let new_counter = new Sub(variable, this.step, last_loc);
-			loop.push(new runBeforeGetValue([variable, new_counter], last_loc));
-			loop.push(new Assign(this.varname, new_counter, last_loc));
-			loop.push(new LoopEnd(null, true, last_loc));
-			code[0].stack.unshift({statementlist: loop, index: 0});
-		}
-		else throw new RuntimeError(this.first_line, this.varname.varname + "は数値型の変数ではありません");
-		super.run();
-	}
-}
-
+ class ForDec extends Statement
+ {
+	 constructor(varname, begin, end, step, statementlist,loc)
+	 {
+		 super(loc);
+		 if(!(varname instanceof Variable || varname instanceof Variable)) throw new RuntimeError(loc.first_line, "繰り返しのカウンタは変数でなくてはいけません");
+		 this.varname = varname;
+		 this.begin = begin;
+		 this.end = end;
+		 this.step = step;
+		 this.statementlist = statementlist;
+		 this.state = 0;
+	 }
+	 clone()
+	 {
+		 var state = [];
+		 for(var i = 0; i < this.statementlist.length; i++) state.push(this.statementlist[i].clone());
+		 return new ForInc(this.varname.clone(), this.begin.clone(), this.end.clone(), this.step.clone(), state, this.loc);
+	 }
+	 run()
+	 {
+		 if(this.varname instanceof UNDEFINED) throw new RuntimeError(this.first_line, "未完成のプログラムです");
+		 if(this.state == 0)
+		 {
+			 code[0].stack.unshift({statementlist: [new Assign(this.varname, this.begin.getValue(), null, this.loc)], index: 0});
+			 this.state = 1;
+		 }
+		 else
+		 {
+			 code[0].stack[0].index++;
+			 if(this.begin.getValue() instanceof IntValue || this.begin.getValue() instanceof FloatValue)
+			 {
+				 let variable = new Variable(this.varname.varname, this.varname.args,this.loc);
+				 let condition = new GE(variable, this.end, this.loc);	// IncとDecの違うところ
+				 let loop = [variable, condition, new LoopBegin(condition, true, this.loc)];
+				 for(let i = 0; i < this.statementlist.length; i++)loop.push(this.statementlist[i]);
+				 loop.push(this.step);
+				 loop.push(new Assign(variable, this.step, '-', this.loc));	// IncとDecの違うところ
+				 loop.push(new LoopEnd(null, true, this.loc));
+				 code[0].stack.unshift({statementlist: loop, index: 0});
+			 }
+			 else throw new RuntimeError(this.first_line, '初期値は数値型である必要があります');
+			 this.state = 0;
+		 }
+	 }
+ }
+ 
 class Until extends Statement
 {
 	constructor(statementlist, condition, loc)
@@ -2482,14 +4274,18 @@ class Until extends Statement
 		this.condition = condition;
 		this.statementlist = statementlist;
 	}
+	clone()
+	{
+		var state = []
+		for(var i = 0; i < this.statementlist.length; i++) state.push(this.statementlist[i].clone());
+		return new Until(this.condition.clone(), state, this.loc);
+	}
 	run()
 	{
-		super.run();
-		let last_token = {first_line: this.last_line, last_line: this.last_line};
-		let loop = [new LoopBegin(null, true, this.loc)];
-		for(var i = 0; i < this.statementlist.length; i++) loop.push(this.statementlist[i]);
-		loop.push(new runBeforeGetValue([this.condition], this.loc));
-		loop.push(new LoopEnd(this.condition, false, new Location(last_token, last_token)));
+		code[0].stack[0].index++;
+		let loop = [new LoopBegin(null, false, this.loc)];
+		for(var i = 0; i < this.statementlist.length; i++) loop.push(this.statementlist[i].clone());
+		loop.push(new LoopEnd(this.condition, false, this.loc));
 		code[0].stack.unshift({statementlist: loop, index: 0});
 	}
 }
@@ -2501,14 +4297,20 @@ class While extends Statement
 		super(loc);
 		this.condition = condition;
 		this.statementlist = statementlist;
+		this.state = 0;
+	}
+	clone()
+	{
+		var state = [];
+		for(var i = 0; i < this.statementlist.length; i++) state.push(this.statementlist[i].clone());
+		return new While(this.condition.clone(), state, this.loc);
 	}
 	run()
 	{
-		super.run();
-		let last_token = {first_line: this.last_line, last_line: this.last_line};
-		let loop = [new runBeforeGetValue([this.condition], this.loc), new LoopBegin(this.condition, true, this.loc)];
-		for(var i = 0; i < this.statementlist.length; i++) loop.push(this.statementlist[i]);
-		loop.push(new LoopEnd(null, false, new Location(last_token, last_token)));
+		code[0].stack[0].index++;
+		let loop = [new LoopBegin(this.condition, true, this.loc)];
+		for(var i = 0; i < this.statementlist.length; i++) loop.push(this.statementlist[i].clone());
+		loop.push(new LoopEnd(null, false, this.loc));
 		code[0].stack.unshift({statementlist: loop, index: 0});
 	}
 }
@@ -2520,10 +4322,47 @@ class SleepStatement extends Statement
 		super(loc)
 		this.sec = new IntValue(sec.value, loc); // milli seconds
 	}
+	clone()
+	{
+		return new SleepStatement(this.sec.clone(), this.loc);
+	}
 	run()
 	{
 		wait_time = this.sec.value;
-		super.run();
+		code[0].stack[0].index++;
+	}
+}
+
+class NopStatement extends Statement
+{
+	constructor(loc) {super(loc);}
+	clone()	{return new NopStatement(this.loc);}
+	run(){ code[0].stack[0].index++;}
+}
+
+class PauseStatement extends Statement
+{
+	constructor(loc) {super(loc);}
+	clone(){return new PauseStatement(this.loc);}
+	run(){code[0].stack[0].index++; }
+}
+
+class BreakStatement extends Statement
+{
+	constructor(loc){super(loc);}
+	clone()
+	{
+		return new BreakStatement(this.loc);
+	}
+	run()
+	{
+		while(true)
+		{
+			var block = code[0].stack.shift();
+			if(!block) throw new RuntimeError(this.first_line, '繰り返しの中ではありません。');
+			for(var i = 0; i < block.statementlist.length; i++)
+				if(block.statementlist[i] instanceof LoopBegin) return;
+		}
 	}
 }
 
@@ -2552,36 +4391,54 @@ function highlightLine(l)
 	}
 }
 
-function reset()
-{
-	varTables = [new varTable()];
-	myFuncs = {};
-	current_line = -1;
-	if(selected_quiz < 0) textareaClear();
-	setRunflag(false);
-	code = null;
-	highlightLine(-1);
-	returnValues = [];
-	var canvas = document.getElementById('canvas');
-	canvas.style.display = 'none';
-	var input_area = document.getElementById('input_area');
-	input_area.readOnly = true;
-	input_area.value = '';
-	document.getElementById('input_status').style.visibility = 'hidden';
-	context = null;
-	wait_time = 0;
-	timeouts = [];
-	selected_quiz_input = selected_quiz_output = 0;
-	output_str = '';
-}
-
+/**
+ *  実行状態の初期化
+ *  @param {boolean} b 出力エリアを初期化する
+ */
+ function reset(b = true)
+ {
+	 varTables = [new varTable()];
+	 myFuncs = {};
+	 current_line = -1;
+	 if(b){
+		 textareaClear();
+		 highlightLine(-1);
+		 var canvas = document.getElementById('canvas');
+		 canvas.style.display = 'none';
+		 document.getElementById('input_status').style.visibility = 'hidden';
+		 context = null;
+		 Plotly.purge(document.getElementById('graph'));
+	 }
+	 setRunflag(false);
+	 code = null;
+	 var input_area = document.getElementById('input_area');
+	 input_area.readOnly = true;
+	 input_area.value = '';
+	 wait_time = 0;
+	 timeouts = [];
+	 selected_quiz_input = selected_quiz_output = 0;
+	 output_str = '';
+ }
+ 
 function setRunflag(b)
 {
 	run_flag = b;
 	document.getElementById("sourceTextarea").readOnly = b;
 	document.getElementById("runButton").innerHTML = b & !step_flag ? "中断" : "実行";
+	document.getElementById("dumpButton").disabled = !step_flag;
+	setEditableflag(!b);
 }
-
+/**
+ *  編集可能フラグの設定
+ * @param {boolean} b 
+ */
+ function setEditableflag(b)
+ {
+	 editable_flag = b;
+	 document.getElementById("drawButton").disabled = !b;
+	//  document.getElementById("urlButton").disabled = !b;
+ }
+ 
 function run()
 {
 	if(code == null)
@@ -2596,9 +4453,9 @@ function run()
 		{
 			if(selected_quiz < 0)
 			{
+				if(e.line) textareaAppend(e.line + "行目");
 				textareaAppend("構文エラーです\n" + e.message + "\n");
-				setRunflag(false);
-				code = null;
+				reset(false);
 				return;
 			}
 			else throw e;
@@ -2626,7 +4483,7 @@ function step()
 			next_line();
 		}while(run_flag && l == current_line);
 		if(!code) return;
-		if(code[0].stack.length > 0)
+		if(code[0] && code[0].stack.length > 0)
 		{
 			if(run_flag && !step_flag)
 			{
@@ -2638,14 +4495,18 @@ function step()
 				setZeroTimeout(step, 0);
 			}
 		}
-		else if(code[0].finish) code[0].finish();
+		else
+		{
+			textareaAppend("---\n");
+			reset(false);
+		}
 	}
 	else
 	{
 		do{
 			next_line();
 			if(Date.now() > test_limit_time) throw new RuntimeError(-1, '時間がかかりすぎです。');
-		}while(run_flag && code[0].stack.length > 0);
+		}while(run_flag && code[0] && code[0].stack.length > 0);
 	}
 }
 
@@ -2656,6 +4517,7 @@ function next_line()
 	if(statement)
 	{
 		try{
+			// code_dump();
 			statement.run();
 		}
 		catch(e)
@@ -2664,8 +4526,7 @@ function next_line()
 			{
 				if(e instanceof RuntimeError) textareaAppend("実行時エラーです\n" + e.line + "行目:" + e.message + "\n");
 				else textareaAppend("実行時エラーです\n" + e + "\n");
-				setRunflag(false);
-				code = null;
+				reset(false);
 			}
 			else throw e;
 		}
@@ -2677,77 +4538,48 @@ function next_line()
 	while(index < 0 || index >= code[0].stack[0].statementlist.length)
 	{
 		code[0].stack.shift();
-		if(code[0].stack.length < 1) break;
-		index = code[0].stack[0].index;
+		while(code[0] && code[0].stack.length < 1) code.shift();
+		if(code.length < 1) break;
+		index = (code[0] && code[0].stack[0]) ? code[0].stack[0].index : -1;
 	}
 	if(selected_quiz < 0)
 	{
 		// 次の行をハイライト表示する
-		if(code[0].stack[0])
+		if(code[0] && code[0].stack[0])
 		{
 			index = code[0].stack[0].index;
 			statement = code[0].stack[0].statementlist[index];
-			if(statement)
+			if(statement && (statement instanceof Statement))
 			{
-				highlightLine(current_line = statement.first_line);
+				if(statement.loc) highlightLine(current_line = statement.first_line);
+				if(statement instanceof PauseStatement) step_flag = true;
 			}
 		}
 		else highlightLine(++current_line);
-
-	}
-}
-
-
-function openInputWindow()
-{
-	setRunflag(false);
-	var input_area = document.getElementById("input_area");
-	input_area.value = '';
-	input_area.readOnly = false;
-	input_area.focus();
-	document.getElementById("input_status").style.visibility = 'visible';
-	document.getElementById("sourceTextarea").readOnly = true;
-}
-
-function closeInputWindow()
-{
-	var val = document.getElementById("input_area").value;
-	document.getElementById("input_area").readOnly = true;
-	document.getElementById("input_status").style.visibility = 'hidden';
-	return val;
-}
-
-function keydownInput(e)
-{
-	var evt = e || window.event
-	if(evt.keyCode == 13)
-	{
-		setRunflag(true);
-		step();
-		//setTimeout(, 100);
-	}
-	else if(evt.keyCode == 27)
-	{
-		closeInputWindow();
-		code.shift();
 	}
 }
 
 
 function editButton(add_code)
 {
+	if(document.getElementById("sourceTextarea").readOnly) 
+	{
+		window.alert("プログラム実行・中断中はプログラムを編集できません");
+		return;
+	}
+
 	var sourceTextArea = document.getElementById("sourceTextarea");
 	var pos = sourceTextArea.selectionStart;
 	var code = sourceTextArea.value;
 	var code1 = code.slice(0, pos);
 	var code2 = code.slice(pos, code.length);
-	var re1 = /[｜| 　]*$/;
-	var re2 = /[｜| 　\n]/;
+	var re1 = /[│ 　]*$/;
+	var re2 = /[│ 　\n]/;
 	var add_codes = add_code.split("\n");
 	var tab = "";
 	var array = re1.exec(code1);
 	if(array != null) tab = array[0];
-	console.log("[" + pos + ":" +code[pos]+"]");
+	// console.log("[" + pos + ":" +code[pos]+"]");
 	if((code[pos] && code[pos] != "\n") || (pos > 0 && !re2.exec(code[pos - 1])))
 	{
 		alert("この位置で入力支援ボタンを押してはいけません");
@@ -2770,7 +4602,7 @@ function keyUp(e)
 	var code2 = code.slice(pos, code.length);
 	var re1 = /《[^》《]*$/;
 	var re2 = /^[^》《]*》/;
-	var re3 = /\n?([｜|]*)([^｜|\n]*?)\n$/;
+	var re3 = /\n?([│]*)([^│\n]*?)\n$/;
 	var re4 = /(ならば|なければ|(の間|繰り返し|繰返し|(増|減)やし(ながら|つつ))[，,、])$/;
 	var re4a= /^(関数|手続き).*\(.*\)$/;
 	var re5 = /^\n/;
@@ -2794,7 +4626,7 @@ function keyUp(e)
 		if(match)
 		{
 			 tab = match[1] ;
-			 if(re4.exec(match[2]) || re4a.exec(match[2])) tab = "｜" + tab;
+			 if(re4.exec(match[2]) || re4a.exec(match[2])) tab = "│" + tab;
 		}
 		sourceTextArea.value = code1 + tab + code2;
 		pos = code1.length + tab.length;
@@ -3050,10 +4882,6 @@ class Flowchart
         bar.next = end;
         this.top.setValue("はじめ");
         end.setValue("おわり");
-		document.getElementById("variable_int").value = '';
-		document.getElementById("variable_float").value = '';
-		document.getElementById("variable_string").value = '';
-		document.getElementById("variable_bool").value = '';
     }
     code2flowchart(parse)
     {
@@ -3068,23 +4896,7 @@ class Flowchart
 			var p = statementlist[i];
 			if(!p) continue;
 			var statement = constructor_name(p);
-			if(statement == "DefinitionInt")
-			{
-				document.getElementById("variable_int").value = p.getCode();
-			}
-			else if(statement == "DefinitionFloat")
-			{
-				document.getElementById("variable_float").value = p.getCode();
-			}
-			else if(statement == "DefinitionString")
-			{
-				document.getElementById("variable_string").value = p.getCode();
-			}
-			else if(statement == "DefinitionBoolean")
-			{
-				document.getElementById("variable_bool").value = p.getCode();
-			}
-			else if(statement == "Assign")
+			if(statement == "Assign")
 			{
 				var p1 = new Parts_Substitute();
 				var b1 = new Parts_Bar();
@@ -3104,7 +4916,9 @@ class Flowchart
 			{
 				var p1 = new Parts_Output();
 				var b1 = new Parts_Bar();
-				p1.setValue(p.value.getCode(), p.ln);
+				var v0 = [];
+				for(var j = 0; j < p.value.length; j++) v0.push(p.value[j].getCode());
+				p1.setValue(v0.join(','), p.ln);
 				parts.next = p1;
 				parts = p1.next = b1;
 			}
@@ -3205,11 +5019,6 @@ class Flowchart
     {
 		if(!flowchart_display) return;
         var code = '';
-		code += variable2code("整数", "variable_int");
-		code += variable2code("実数", "variable_float");
-		code += variable2code("文字列", "variable_string");
-		code += variable2code("真偽", "variable_bool");
-		code += this.top.appendCode('', 0);
 		document.getElementById("sourceTextarea").value = code;
     }
     paint()
@@ -3330,7 +5139,7 @@ class Parts
     static makeIndent(indent_level)
     {
         var s = "";
-        for(var i = 0; i < indent_level; i++) s += "｜";
+        for(var i = 0; i < indent_level; i++) s += "│";
         return s;
     }
 	editMe()

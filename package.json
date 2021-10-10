@@ -1,6 +1,6 @@
 {
   "name": "wapen",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "description": "Web-aided PEN",
   "author": "watayan",
   "maintainers": [
@@ -10,34 +10,27 @@
     }
   ],
   "license": "MIT",
-  "main": "run1.js",
+  "main": "run.min.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "babel run.js -o run1.js",
-    "jison": "jison dncl.jison; patch < dncl.patch"
+    "build": "uglifyjs run.js -o run.min.js",
+    "jison": "jison dncl.jison; patch < dncl.patch; uglifyjs dncl.js -o dncl.min.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/watayan/WaPEN.git"
+    "url": "git+https://github.com/watayan/PyPEN.git"
   },
   "bugs": {
-    "url": "https://github.com/watayan/WaPEN/issues"
+    "url": "https://github.com/watayan/PyPEN/issues"
   },
-  "homepage": "https://github.com/watayan/WaPEN#readme",
-  "babel": {
-    "presets": [
-      "env"
-    ]
-  },
+  "homepage": "https://github.com/watayan/PyPEN#readme",
   "devDependencies": {
-    "babel-cli": "^6.26.0",
-    "babel-preset-env": "^1.7.0",
-    "jison": "^0.4.18"
+    "jison": "^0.4.18",
+    "uglify-es": "^3.3.9"
   },
   "dependencies": {
     "eslint": "^5.16.0",
-    "jquery": "^3.4.1",
-    "jquery-contextmenu": "^2.8.0",
-    "npm": "^6.11.2"
+    "jison-lex": "^0.3.4",
+    "npm": "^6.14.8"
   }
 }
