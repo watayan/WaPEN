@@ -2447,14 +2447,13 @@ class Variable extends Value
 		}
 		else throw new RuntimeError(loc.first_line, "appendの引数の型が違います");
 	}),
-	"split": new DefinedFunction(2, function(param, loc){
+	"split": new DefinedFunction([1,2], function(param, loc){
 		var par1 = param[0].getValue();
-		var par2 = param[1].getValue();
-		if(par1 instanceof StringValue && par2 instanceof StringValue)
+		var par2 = param.length == 2 ? param[1].getValue() : null;
+		if(par1 instanceof StringValue && (par2 instanceof StringValue || par2 == null))
 		{
 			var v1 = par1.value;
-			var v2 = par2.value;
-			var v = v1.split(v2);
+			var v = par2 ? v1.split(par2.value) : v1.split("");
 			var vr = [];
 			for(var i = 0; i < v.length; i++) vr.push(new StringValue(v[i], this.loc));
 			return new ArrayValue(vr, this.loc);
@@ -2511,7 +2510,47 @@ class Variable extends Value
 			return new StringValue(s1 + v4 + s2, this.loc);
 		}
 		else throw new RuntimeError(loc.first_line, "replaceの引数の型が違います");
-	})
+	}),
+	"isfile": new DefinedFunction(1, function(param, loc){
+		var par = param[0].getValue();
+		if(par instanceof StringValue) return new BooleanValue(storage.getItem(par.value) != null, loc);
+		else throw new RuntimeError(loc.first_line, "ファイル名は文字列でなくてはいけません");
+	}),
+	"openr": new DefinedFunction(1, function(param, loc){
+		var par = param[0].getValue();
+		if(par instanceof StringValue) return new IntValue(filesystem.openr(par.value), loc);
+		else throw new RuntimeError(loc.first_line, "ファイル名は文字列でなくてはいけません");
+	}),
+	"openw": new DefinedFunction(1, function(param, loc){
+		var par = param[0].getValue();
+		if(par instanceof StringValue) return new IntValue(filesystem.openw(par.value), loc);
+		else throw new RuntimeError(loc.first_line, "ファイル名は文字列でなくてはいけません");
+	}),
+	"opena": new DefinedFunction(1, function(param, loc){
+		var par = param[0].getValue();
+		if(par instanceof StringValue) return new IntValue(filesystem.opena(par.value), loc);
+		else throw new RuntimeError(loc.first_line, "ファイル名は文字列でなくてはいけません");
+	}),
+	"getline": new DefinedFunction(1, function(param, loc){
+		var par1 = param[0].getValue();
+		if(par1 instanceof IntValue)
+		{
+			var rtnv = filesystem.read_line(par1.value);
+			if(rtnv == null) throw new RuntimeError(loc.first_line, "ファイル番号が不正です");
+			return new StringValue(rtnv, loc);
+		}
+		else throw new RuntimeError(loc.first_line, "ファイル番号が必要です");
+	}),
+	"getchar": new DefinedFunction(1, function(param, loc){
+		var par1 = param[0].getValue();
+		if(par1 instanceof IntValue)
+		{
+			var rtnv = filesystem.read_ch(par1.value);
+			if(rtnv == null) throw new RuntimeError(loc.first_line, "ファイル番号が不正です");
+			return new StringValue(rtnv, loc);
+		}
+		else throw new RuntimeError(loc.first_line, "ファイル番号が必要です");
+	}),
 };
 
 function setCaller(statementlist, caller)
@@ -3561,6 +3600,52 @@ function array2code(v)
 	return v0.value;
 }
 
+class FileIOStatement extends Statement
+{
+	constructor(command, args, loc)
+	{
+		super(loc);
+		this.command = command;
+		this.args = args;
+		this.state = 0;
+	}
+	clone()
+	{
+		var args = [];
+		for(var i = 0; i < this.args.length; i++) args.push(this.args[i].clone());
+		return new FileIOStatement(this.command, args, this.loc);
+	}
+	run()
+	{
+		if(this.state == 0)
+		{
+			if(this.args) code[0].stack.unshift({statementlist: this.args, index: 0});
+			this.state = 1;
+		}
+		else
+		{
+			code[0].stack[0].index++;
+			if(this.command == 'putline')
+			{
+				var str = array2text(this.args[1].getValue());
+				var rtnv = filesystem.write_str(this.args[0].getValue().value, str, true);
+				if(!rtnv) throw new RuntimeError(this.first_line, "呼び出しが不正です");
+			}
+			else if(this.command == 'putstr')
+			{
+				var str = array2text(this.args[1].getValue());
+				var rtnv = filesystem.write_str(this.args[0].getValue().value, str, false);
+				if(!rtnv) throw new RuntimeError(this.first_line, "呼び出しが不正です");
+			}
+			else if(this.command == 'close')
+			{
+				var rtnv = filesystem.close(this.args[0].getValue().value, true);
+				if(!rtnv) throw new RuntimeError(this.first_line, "呼び出しが不正です");
+			}
+		}
+	}
+}
+
 class GraphicStatement extends Statement
 {
 	constructor(command, args, loc)
@@ -4395,30 +4480,31 @@ function highlightLine(l)
  *  実行状態の初期化
  *  @param {boolean} b 出力エリアを初期化する
  */
- function reset(b = true)
- {
-	 varTables = [new varTable()];
-	 myFuncs = {};
-	 current_line = -1;
-	 if(b){
-		 textareaClear();
-		 highlightLine(-1);
-		 var canvas = document.getElementById('canvas');
-		 canvas.style.display = 'none';
-		 document.getElementById('input_status').style.visibility = 'hidden';
-		 context = null;
-		 Plotly.purge(document.getElementById('graph'));
-	 }
-	 setRunflag(false);
-	 code = null;
-	 var input_area = document.getElementById('input_area');
-	 input_area.readOnly = true;
-	 input_area.value = '';
-	 wait_time = 0;
-	 timeouts = [];
-	 selected_quiz_input = selected_quiz_output = 0;
-	 output_str = '';
- }
+function reset(b = true)
+{
+	varTables = [new varTable()];
+	myFuncs = {};
+	current_line = -1;
+	if(b){
+		textareaClear();
+		highlightLine(-1);
+		var canvas = document.getElementById('canvas');
+		canvas.style.display = 'none';
+		document.getElementById('input_status').style.visibility = 'hidden';
+		context = null;
+		Plotly.purge(document.getElementById('graph'));
+	}
+	setRunflag(false);
+	code = null;
+	var input_area = document.getElementById('input_area');
+	input_area.readOnly = true;
+	input_area.value = '';
+	wait_time = 0;
+	timeouts = [];
+	selected_quiz_input = selected_quiz_output = 0;
+	output_str = '';
+	storage_list_update();
+}
  
 function setRunflag(b)
 {
@@ -4987,6 +5073,14 @@ class Flowchart
 				p1._end = p2; p2._begin = p1;
 				Flowchart.appendParts(b1, p.statementlist);
 				parts = b2;
+			}
+			else if(statement == "FileIOStatement")
+			{
+				var p1 = new Parts_Misc();
+				var b1 = new Parts_Bar();
+				p1.setValue(p.command, p.args);
+				parts.next = p1;
+				parts = p1.next = b1;
 			}
 			else if(statement == "GraphicStatement")
 			{
@@ -6242,7 +6336,11 @@ var misc_menu_ja =[
 	["楕円塗描画"     , "gFillOval"    , "楕円塗描画(	,	,	,	)"        ,["x","y","幅","高さ"]],
 	["弧描画"      , "gDrawArc"     	, "弧描画(	,	,	,	,	,	,	)"          ,["x","y","幅","高さ","開始角","終了角","閉じ方"]],
 	["弧塗描画"     , "gFillArc"    	, "弧塗描画(	,	,	,	,	,	,	)"        ,["x","y","幅","高さ","開始角","終了角","閉じ方"]],
+	["putline"		, "putline"			,"putline(	,	)"				,["ファイル番号","文字列"]],
+	["putstr"		, "putstr"			,"putstr(	,	)"				,["ファイル番号","文字列"]],
+	["close"		, "close"			,"close(	)"					,["ファイル番号"]],
 	["待つ"       , "sleep"           , "	 ミリ秒待つ"                 ,["ミリ秒数"]],
+	["一時停止する", "PauseStatement", "一時停止する",[]],
 	["変数を確認する", "dump"			,"変数を確認する",[]]
 ];
 
@@ -6268,7 +6366,11 @@ var misc_menu_en =[
 	["gFillOval"     , "gFillOval"    , "gFillOval(	,	,	,	)"        ,["x","y","幅","高さ"]],
 	["gDrawArc"      , "gDrawArc"     	, "gDrawArc(	,	,	,	,	,	,	)"          ,["x","y","幅","高さ","開始","終了","閉じ方"]],
 	["gFillArc"     , "gFillArc"    	, "gFillArc(	,	,	,	,	,	,	)"        ,["x","y","幅","高さ","開始","終了","閉じ方"]],
+	["putline"		, "putline"			,"putline(	,	)"				,["ファイル番号","文字列"]],
+	["putstr"		, "putstr"			,"putstr(	,	)"				,["ファイル番号","文字列"]],
+	["close"		, "close"			,"close(	)"					,["ファイル番号"]],
 	["待つ"       , "sleep"           , "	 ミリ秒待つ"                 ,["ミリ秒数"]],
+	["一時停止する", "PauseStatement", "一時停止する",[]],
 	["変数を確認する", "dump"			,"変数を確認する",[]]
 ];
 
@@ -6621,6 +6723,10 @@ onload = function(){
 	resetButton.onclick = function(){
 		reset();
 	};
+	document.getElementById("loadButton1").onclick = function(ev){
+		loadButton.click();
+		return false;
+	};
 	loadButton.addEventListener("change", function(ev)
 	{
 		var file = ev.target.files;
@@ -6636,12 +6742,12 @@ onload = function(){
 	,false);
 	downloadLink.onclick = function()
 	{
-		var now = new Date();
 		var filename = file_prefix.value.trim();
 		if(filename.length < 1)
-			filename = now.getFullYear() + ('0' + (now.getMonth() + 1)).slice(-2) +
-			('0' + now.getDate()).slice(-2) + '_' + ('0' + now.getHours()).slice(-2) +
-			('0' + now.getMinutes()).slice(-2) + ('0' + now.getSeconds()).slice(-2);
+		{
+			alert("ファイル名を入力しないと保存できません");
+			return false;
+		}
 		filename +=	'.PEN';
 		var blob = new Blob([sourceTextArea.value], {type:"text/plain"});
 		if(window.navigator.msSaveBlob)
@@ -6656,6 +6762,78 @@ onload = function(){
 		}
 		makeDirty(false);
 	};
+	document.getElementById("storage_download").onclick = function(ev)
+	{
+		var element = document.getElementById("storage_download");
+		var list = document.getElementById("storage_list");
+		var n = list.options.selectedIndex;
+		if(n >= 0 && n < storage.length)
+		{
+			var filename = list.options[n].value;
+			var str = storage.getItem(filename);
+			var blob = new Blob([str], {type:"text/plain"});
+			if(window.navigator.msSaveBlob)
+			{
+				window.navigator.msSaveBlob(blob, filename);
+			}
+			else
+			{
+				window.URL = window.URL || window.webkitURL;
+				element.setAttribute("href", window.URL.createObjectURL(blob));
+				element.setAttribute("download", filename);
+			}
+		}
+		else
+		{
+			element.removeAttribute("href");
+		}
+	};
+	
+	
+	document.getElementById("storage_upload1").onclick = function(ev){
+		document.getElementById("storage_upload").click();
+		return false;
+	}
+	
+	document.getElementById("storage_upload").addEventListener("change", function(ev){
+		var file = ev.target.files;
+		var reader = new FileReader();
+		reader.readAsText(file[0], "UTF-8");
+		reader.onload = function(ev)
+		{
+			var data = reader.result;
+			try{
+				storage.setItem(file[0].name,data);
+				storage_list_update();
+			}
+			catch(e)
+			{
+				window.alert("ストレージに保存できませんでした");
+			}
+		}
+	});
+	
+	document.getElementById("storage_remove").onclick = function(ev)
+	{
+		var list = document.getElementById("storage_list");
+		var n = list.options.selectedIndex;
+		if(n >= 0)
+		{
+			var key = list.options[n].value;
+			storage.removeItem(key);
+			storage_list_update();	
+		}
+	};
+	
+	document.getElementById("storage_clear").onclick = function(ev)
+	{
+		if(window.confirm("ストレージを空にしていいですか？"))
+		{
+			storage.clear();
+			storage_list_update();	
+		}
+	};
+	
 	flowchartButton.onchange = function(){
 		flowchart_display = this.checked;
 		var flowchart_area = document.getElementById("Flowchart_area");
@@ -6713,17 +6891,19 @@ onload = function(){
 //				copyAll: {name: "プログラムをコピー", callback(k,e){document.getElementById("sourceTextarea").select(); document.execCommand('copy');}},
 				zenkaku: {name: "入力補助",
 					items:{
-						かつ:		{name:"かつ",	callback(k,e){insertCode("《値》 かつ 《値》");}},
+						かつ:	{name:"かつ",	callback: function(k,e){insertCode("《値》 かつ 《値》");}},
 						または:	{name:"または",	callback: function(k,e){insertCode("《値》 または 《値》");}},
 						でない:	{name:"でない",	callback: function(k,e){insertCode("《値》 でない");}},
 						と:		{name:"と",		callback: function(k,e){insertCode("《値》と《値》");}},
+						割り算: {name:"÷",	   callback: function(k,e){insertCode("《値》÷《値》");}},
 						カッコ:	{name:"「」",	callback: function(k,e){insertCode("「《値》」");}},
 					}
 				},
 				math:{ name:"数学関数",
 				 	items:{
 						abs:	{name:"abs 絶対値", callback: function(k,e){insertCode("abs(《値》)");}},
-						random:	{name: "random 乱数", callback: function(k,e){insertCode("random(《整数》)");}},
+						random1:{name: "random 乱数（整数）", callback: function(k,e){insertCode("random(《整数》)");}},
+						random2:{name: "random 乱数（0〜1）", callback: function(k,e){insertCode("random()");}},
 						ceil:	{name: "ceil 切り上げ", callback: function(k,e){insertCode("ceil(《実数》)");}},
 						floor:	{name: "floor 切り捨て", callback: function(k,e){insertCode("floor(《実数》)");}},
 						round:	{name: "round 四捨五入", callback: function(k,e){insertCode("round(《実数》)");}},
@@ -6740,11 +6920,24 @@ onload = function(){
 					items:{
 						length:	{name: "length 長さ", callback: function(k,e){insertCode("length(《文字列》)");}},
 						append:	{name: "append 文字列結合", callback: function(k,e){insertCode("append(《文字列》,《文字列》)");}},
+						split1:	{name: "split 文字列分割（1文字ずつ）", callback: function(k,e){insertCode("split(《文字列》)");}},
+						split2:	{name: "split 文字列分割（区切り文字指定）", callback: function(k,e){insertCode("split(《文字列》,《文字列》)");}},
 						substring1:	{name: "substring 部分文字列（最後まで）", callback: function(k,e){insertCode("substring(《文字列》,《開始位置》)");}},
 						substring2:	{name: "substring 部分文字列（長さ指定）", callback: function(k,e){insertCode("substring(《文字列》,《開始位置》,《長さ》)");}},
 						extract:	{name: "extract 部分文字列（長さ指定）", callback: function(k,e){insertCode("extract(《文字列》,《区切文字列》,《番号》)");}},
 						insert:	{name: "insert 挿入", callback: function(k,e){insertCode("insert(《文字列》,《位置》,《文字列》)");}},
 						replace:	{name: "replace 置換", callback: function(k,e){insertCode("replace(《文字列》,《位置》,《長さ》,《文字列》)");}},
+					}
+				},
+				fileio:{name: "File I/O",
+					items:{
+						openr: {name:"openr 読込用オープン", callback: function(k,e){insertCode("openr(《ファイル名》)");}},
+						openw: {name:"openr 書込用オープン", callback: function(k,e){insertCode("openw(《ファイル名》)");}},
+						opena: {name:"openr 追記用オープン", callback: function(k,e){insertCode("opena(《ファイル名》)");}},
+						getline: {name:"getline", callback: function(k,e){insertCode("getline(《ファイル番号》)");}},
+						getchar: {name:"getchar", callback: function(k,e){insertCode("getchar(《ファイル番号》)");}},
+						putline: {name:"putline", callback: function(k,e){insertCode("putline(《ファイル番号》,《文字列》)");}},
+						putstr:  {name:"putstr",  callback: function(k,e){insertCode("putstr(《ファイル番号》,《文字列》)");}},
 					}
 				},
 				graphic1:{ name:"グラフィック命令（日本語）",
@@ -6796,6 +6989,7 @@ onload = function(){
 				misc:{name: "各種命令",
 					items:{
 						sleep:{name:"待つ", callback: function(k,e){insertCode("《ミリ秒数》 ミリ秒待つ");}},
+						pause:{name:"一時停止する", callback: function(k,e){insertCode("一時停止する");}},
 						dump:{name:"変数を確認する", callback: function(k,e){insertCode("変数を確認する");}}
 					}
 				}
@@ -6884,7 +7078,43 @@ onload = function(){
 	{
 		document.getElementById('Quiz_area').style.display = 'none';
 	}
-
+	document.getElementById('urlButton').onclick = function()
+	{
+		var code = sourceTextArea.value.trim();
+		if(code == '') return;
+		code = B64encode(code);
+		if(code){
+			var url = window.location;
+			textareaClear();
+			highlightLine(-1);
+			textareaAppend(url.protocol + '//' + url.hostname + url.pathname + '?code=' + code);
+		} 
+	}
+	var param_code = getParam('code');
+	if(param_code) sourceTextArea.value = param_code;
+	storage_list_update();
+}
+function storage_list_update()
+{
+	var list = document.getElementById("storage_list");
+	while(list.options.length) list.options.remove(0);
+	var n = storage.length;
+	if(n > 0)
+	{
+		for(var i = 0; i < n; i++)
+		{
+			var option = document.createElement("option");
+			option.text = option.value = storage.key(i);
+			list.appendChild(option);
+		}
+	}
+	else
+	{
+		var option = document.createElement("option");
+		option.text = "--空--";
+		// option.attributes.add("disabled");
+		list.appendChild(option);
+	}
 }
 
 function auto_marking(i)
@@ -6940,4 +7170,21 @@ function font_size(updown)
 	elem = document.getElementsByClassName('bcr_number')[0];
 	elem.style.fontSize = fontsize + 'px';
 	elem.style.lineHeight = (fontsize + 2) + 'px';
+}
+
+function getParam(name)
+{
+	var getparam = window.location.search;
+	if(getparam)
+	{
+		var params = getparam.slice(1).split('&');
+		for(var param of params)
+		{
+			var p = param.split('=');
+			if(p[0] == name){
+				return B64decode(p[1]);
+			} 
+		}
+	}
+	return null;
 }

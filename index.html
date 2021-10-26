@@ -15,12 +15,14 @@
 		<button   id="stepButton" type="button">ステップ実行</button>
 		<button   id="resetButton" type="button">リセット</button>
 		<button   id="dumpButton" type="button">変数確認</button>
-		<span     id="dirty">*</span>  
+		<span     id="dirty">*</span><br>
 		<input    id="flowchartButton" type="checkbox">フローチャート
-		<button   id="drawButton" type="button" onclick="codeChange();">コード→フローチャート</button><br>
-		Upload <input id="loadButton" type="file" accept=".PEN"/>
-		<a href="#" id="downloadLink">Download</a>
-		ファイル名：<input id="file_prefix" type="text"/>
+		<button   id="drawButton" type="button" onclick="codeChange();">コード→フローチャート</button>
+		<button   id="urlButton" type="button">URL生成</button><br>
+		<button   id="loadButton1" type="button">Load</button>
+		<input    id="loadButton" type="file" accept=".PEN"/>
+		<a href="#" id="downloadLink"><button>Save</button></a>
+		ファイル名：<input id="file_prefix" type="text"/><br>
 		</div>
 		<div id="Quiz_area">
 			<select id="quiz_select"></select>
@@ -65,6 +67,16 @@
 			<button type="button" onclick="changeSize(-1);" style="width:2em;height:2em;float:left;">−</button>
 		</div>
 		<canvas id="flowchart" width="400px" height="600px"></canvas>
+	</div>
+	<div id="Storage_area">
+		<!-- <p>ファイル一覧</p> -->
+		<button type="button" id="storage_upload1">アップロード</button>
+		<input type="file"    id="storage_upload"></input>
+		<a href="#" id="storage_download"><button id="storage_download1">ダウンロード</button></a>
+		<button type="button" id="storage_remove">削除</button>
+		<button type="button" id="storage_clear">全削除</button><br>
+		<select id="storage_list" size="10">
+		</select>
 	</div>
 	<canvas id="canvas"></canvas>
 	<div id="graph"></div>

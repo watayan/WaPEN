@@ -244,6 +244,9 @@ Whitespace		[\s\t 　│]	// 罫線の縦棒
 "グラフ消去"			{return 'gClearGraph';}
 "gClearGraph"			{return 'gClearGraph';}
 "ミリ秒待つ"			{return 'ミリ秒待つ';}
+"putline"				{return 'putline';}
+"putstr"				{return 'putstr';}
+"close"					{return 'close';}
 "変数を確認する"		{return '変数を確認する';}
 "改行する"				{return '改行する';}
 "何もしない"			{return '何もしない';}
@@ -351,6 +354,7 @@ statement
 	| AssignStatement
 	| PrintStatement
 	| InputStatement
+	| FileIOStatement
 	| GraphicStatement
 	| ForStatement
 	| WhileStatement
@@ -479,6 +483,15 @@ InputStatement
 		{$$ = new Input($1,  typeOfValue.typeString, new Location(@1, @5));}
 	| e 'に' '真偽' 'を入力する' '改行'	
 		{$$ = new Input($1,  typeOfValue.typeBoolean, new Location(@1, @5));}
+	;
+
+FileIOStatement
+	: 'putline' '(' e COMMA e ')' '改行'
+		{$$ = new FileIOStatement('putline', [$3, $5], new Location(@1, @1));}
+	| 'putstr' '(' e COMMA e ')' '改行'
+		{$$ = new FileIOStatement('putstr', [$3, $5], new Location(@1, @1));}
+	| 'close' '(' e ')' '改行'
+		{$$ = new FileIOStatement('close', [$3], new Location(@1, @1));}
 	;
 
 GraphicStatement

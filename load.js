@@ -12,6 +12,8 @@ var scripts = [
     "./sample.js",
     "./quiz.js",
     "./answer.js",
+    "./fileio.js",
+    "./base64.js",
     "./run.min.js"
 ];
 
