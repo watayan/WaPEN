@@ -135,6 +135,7 @@
 #resultTextarea{
 	font-size: 16px;
 	line-height: 18px;
+	resize: both;
 }
 
 #loadButton{
@@ -142,7 +143,7 @@
 }
 
 #Storage_area{
-	float: left;
+	clear: left;
 	margin-left: 4px;
 }
 
@@ -156,4 +157,8 @@
 
 #storage_upload1, #storage_download1, #storage_remove, #storage_clear{
 	height: 2em;
+}
+
+#Right_area{
+	float: left;
 }
