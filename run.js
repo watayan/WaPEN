@@ -4321,7 +4321,7 @@ class ForIn_step extends Statement
 	 {
 		 var state = [];
 		 for(var i = 0; i < this.statementlist.length; i++) state.push(this.statementlist[i].clone());
-		 return new ForInc(this.varname.clone(), this.begin.clone(), this.end.clone(), this.step.clone(), state, this.loc);
+		 return new ForDec(this.varname.clone(), this.begin.clone(), this.end.clone(), this.step.clone(), state, this.loc);
 	 }
 	 run()
 	 {

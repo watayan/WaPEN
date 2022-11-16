@@ -120,6 +120,9 @@
 
 #bcralnit_sourceTextarea0{
 	float: left;
+	resize: horizontal;
+	min-width: 200px;
+	min-height: 200px;
 }
 
 .bcr_numbers{
@@ -129,12 +132,26 @@
 
 #sourceTextarea {
 	font-size: 16px;
-	line-height: 18px;
+	line-height: 1.2;
+	/* border: 1px black solid; */
+}
+
+#sourceTextarea:read-only{
+	background-color: lightgray;
+	background-image: none;
+}
+
+#sourceTextarea:-moz-read-only{ /* for firefox */
+	background-color: lightgray;
+	background-image: none;
 }
 
 #resultTextarea{
 	font-size: 16px;
-	line-height: 18px;
+	line-height: 1.2;
+	height: 400px;
+	min-width: 100px;
+	min-height: 200px;
 	resize: both;
 }
 
