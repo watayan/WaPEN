@@ -163,7 +163,8 @@ Whitespace		[\s\t 　│]	// 罫線の縦棒
 "を入力する"			{return 'を入力する';}
 "もし"					{return 'もし';}
 "ならば"				{return 'ならば';}
-"を実行し"{Comma}"そうでなければ"			{return 'を実行し，そうでなければ';}
+"を実行し"{Comma}"そうでなくもし"		{return 'を実行し，そうでなくもし';}
+"を実行し"{Comma}"そうでなければ"		{return 'を実行し，そうでなければ';}
 "を実行する"			{return 'を実行する';}
 "を実行"				{return 'を実行する';}
 "の間"{Comma}			{return 'の間，';}
@@ -368,7 +369,7 @@ args
 
 statementlist
 	: statementlist statement	{ if($2 != null) $$ = $1.concat($2);}
-	| 	{$$ = [];}
+	| statement {$$ = [$1];}
 	;
 statement
 	: EmptyStatement
@@ -426,11 +427,44 @@ CallStatement
 		{$$ = new CallStep($1, $3, new Location(@1,@4));}
 	;
 
+If_If
+	: 'もし' e 'ならば' '改行' statementlist
+		{$$ = [$2, $5];}
+	| 'もし' e 'ならば' statement
+		{$$ = [$2, [$4]];}
+	;
+
+If_EndIf
+	: 'を実行する' '改行'
+	  {$$ = null;}
+	;
+
+If_Else
+	: 'を実行し，そうでなければ' '改行' statementlist
+		{$$ = [null, $3];}
+	;
+
+If_ElseIf
+	: 'を実行し，そうでなくもし' e 'ならば' '改行' statementlist
+		{$$ = [$2, $5];}
+	;
+
+If_ElseIfs
+	: If_ElseIfs If_ElseIf
+		{$1.push($2); $$ = $1;}
+	| If_ElseIf
+		{$$ = [$1];}
+	;
+
 IfStatement
-	: 'もし' e 'ならば' '改行' statementlist 'を実行する' '改行'
-		{$$ = new If($2,$5,null, new Location(@1, @6));}
-	| 'もし' e 'ならば' '改行' statementlist 'を実行し，そうでなければ' '改行' statementlist 'を実行する' '改行'
-		{$$ = new If($2,$5,$8, new Location(@1, @9));}
+	: If_If If_ElseIfs If_Else If_EndIf
+		{ tmp = [$1]; tmp = tmp.concat($2); tmp.push($3); $$ = new If(tmp, new Location(@1, @3))}
+	| If_If If_ElseIfs If_EndIf
+		{ tmp = [$1]; tmp = tmp.concat($2); $$ = new If(tmp, new Location(@1, @3))}
+	| If_If If_Else If_EndIf
+		{ tmp = [$1]; tmp.push($2); $$ = new If(tmp, new Location(@1, @3))}
+	| If_If If_EndIf
+		{ tmp = [$1]; $$ = new If(tmp, new Location(@1, @1))}
 	;
 
 ForStatement

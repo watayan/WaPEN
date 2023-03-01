@@ -162,8 +162,8 @@ function codeChange()
 	{
 		highlightLine(-1);
 		textareaClear();
-		if(e.line) textareaAppend(e.line + "行目");
-		textareaAppend('構文エラーです\n' + e.message);;
+		if(e.line && e.line > 0) textareaAppend(e.line + "行目構文エラーです\n");
+		textareaAppend(e.message + "\n");
 		converting = false;
 	}
 }
@@ -821,7 +821,7 @@ class Pow extends Value
 	}
 	clone()
 	{
-		var rtnv = new Pow(this.value[0], this.value[1], this.loc);
+		var rtnv = new Pow(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -881,7 +881,7 @@ class Add extends Value
 	}
 	clone()
 	{
-		var rtnv = new Add(this.value[0], this.value[1], this.loc);
+		var rtnv = new Add(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -953,7 +953,7 @@ class Sub extends Value
 	}
 	clone()
 	{
-		var rtnv = new Sub(this.value[0], this.value[1], this.loc);
+		var rtnv = new Sub(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1012,7 +1012,7 @@ class Mul extends Value
 	}
 	clone()
 	{
-		var rtnv = new Mul(this.value[0], this.value[1], this.loc);
+		var rtnv = new Mul(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1094,7 +1094,7 @@ class Div extends Value	// /
 	}
 	clone()
 	{
-		var rtnv = new Div(this.value[0], this.value[1], this.loc);
+		var rtnv = new Div(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1146,7 +1146,7 @@ class Div2 extends Value // ÷
 	}
 	clone()
 	{
-		var rtnv = new DivInt(this.value[0], this.value[1], this.loc);
+		var rtnv = new DivInt(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1199,7 +1199,7 @@ class Mod extends Value
 	}
 	clone()
 	{
-		var rtnv = new Mod(this.value[0], this.value[1], this.loc);
+		var rtnv = new Mod(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1253,7 +1253,7 @@ class Minus extends Value
 	}
 	clone()
 	{
-		var rtnv = new Minus(this.value[0], this.loc);
+		var rtnv = new Minus(this.value[0].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1304,7 +1304,7 @@ class And extends Value
 	}
 	clone()
 	{
-		var rtnv = new And(this.value[0], this.value[1], this.loc);
+		var rtnv = new And(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1359,7 +1359,7 @@ class Or extends Value
 	}
 	clone()
 	{
-		var rtnv = new Or(this.value[0], this.value[1], this.loc);
+		var rtnv = new Or(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1414,7 +1414,7 @@ class Not extends Value
 	}
 	clone()
 	{
-		var rtnv = new Not(this.value[0], this.loc);
+		var rtnv = new Not(this.value[0].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1459,7 +1459,7 @@ class BitAnd extends Value
 	}
 	clone()
 	{
-		var rtnv = new BitAnd(this.value[0], this.value[1], this.loc);
+		var rtnv = new BitAnd(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1514,7 +1514,7 @@ class BitOr extends Value
 	}
 	clone()
 	{
-		var rtnv = new BitOr(this.value[0], this.value[1], this.loc);
+		var rtnv = new BitOr(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1569,7 +1569,7 @@ class BitXor extends Value
 	}
 	clone()
 	{
-		var rtnv = new BitXor(this.value[0], this.value[1], this.loc);
+		var rtnv = new BitXor(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1624,7 +1624,7 @@ class BitNot extends Value
 	}
 	clone()
 	{
-		var rtnv = new BitNot(this.value[0], this.loc);
+		var rtnv = new BitNot(this.value[0].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1674,7 +1674,7 @@ class BitLShift extends Value
 	}
 	clone()
 	{
-		var rtnv = new BitLShift(this.value[0], this.value[1], this.loc);
+		var rtnv = new BitLShift(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1728,7 +1728,7 @@ class BitRShift extends Value
 	}
 	clone()
 	{
-		var rtnv = new BitRShift(this.value[0], this.value[1], this.loc);
+		var rtnv = new BitRShift(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1812,7 +1812,7 @@ class EQ extends Value
 	}
 	clone()
 	{
-		var rtnv = new EQ(this.value[0], this.value[1], this.loc);
+		var rtnv = new EQ(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1852,7 +1852,7 @@ class NE extends Value
 	}
 	clone()
 	{
-		var rtnv = new NE(this.value[0], this.value[1], this.loc);
+		var rtnv = new NE(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1892,7 +1892,7 @@ class GT extends Value
 	}
 	clone()
 	{
-		var rtnv = new GT(this.value[0], this.value[1], this.loc);
+		var rtnv = new GT(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1932,7 +1932,7 @@ class GE extends Value
 	}
 	clone()
 	{
-		var rtnv = new GE(this.value[0], this.value[1], this.loc);
+		var rtnv = new GE(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -1972,7 +1972,7 @@ class LT extends Value
 	}
 	clone()
 	{
-		var rtnv = new LT(this.value[0], this.value[1], this.loc);
+		var rtnv = new LT(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -2012,7 +2012,7 @@ class LE extends Value
 	}
 	clone()
 	{
-		var rtnv = new LE(this.value[0], this.value[1], this.loc);
+		var rtnv = new LE(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -2041,7 +2041,7 @@ class IN extends Value
 	}
 	clone()
 	{
-		var rtnv = new IN(this.value[0], this.value[1], this.loc);
+		var rtnv = new IN(this.value[0].clone(), this.value[1].clone(), this.loc);
 		rtnv.rtnv = this.rtnv;
 		return rtnv;
 	}
@@ -2559,9 +2559,11 @@ function setCaller(statementlist, caller)
 	{
 		if(statementlist[i].statementlist) setCaller(statementlist[i].statementlist, caller);
 		if(statementlist[i].state) setCaller(statementlist[i].state, caller);
-		if(statementlist[i].state1) setCaller(statementlist[i].state1, caller);
-		if(statementlist[i].state2) setCaller(statementlist[i].state2, caller);
-		if(statementlist[i] instanceof ReturnStatement) statementlist[i].setCaller(caller, true);
+		if(statementlist[i].blocks)
+		{
+				for(var j = 0; j < statementlist[i].blocks.length; j++)
+						setCaller(statementlist[i].blocks[j][1], caller);
+		}		if(statementlist[i] instanceof ReturnStatement) statementlist[i].setCaller(caller, true);
 	}
 }
 
@@ -2592,9 +2594,11 @@ function cloneStatementlist(statementlist)
 	 }
 	 clone()
 	 {
-		 var rtnv = new CallFunction(this.value[0], this.value[1], this.loc);
-		 rtnv.rtnv = this.rtnv;
-		 return rtnv;
+		var parm = [];
+		for(var i = 0; i < this.value[1].length; i++) parm.push(this.value[1][i].clone());
+		var rtnv = new CallFunction(this.value[0], parm, this.loc);
+		rtnv.rtnv = this.rtnv;
+		return rtnv;
 	 }
 	 run()
 	 {
@@ -4066,45 +4070,65 @@ function drawGraph(layout, data, loc)
  {
 	 /**
 	  * 
-	  * @param {Value} condition 
-	  * @param {Array<Statement>} state1 
-	  * @param {Array<Statement>} state2 
+	  * @param {Array} blocks
 	  * @param {Location} loc 
 	  */
-	 constructor(condition, state1, state2, loc)
+	 constructor(blocks, loc)
 	 {
-		 super(loc);
-		 this.condition = condition;
-		 this.state1 = state1;
-		 this.state2 = state2;
+		super(loc);
+		this.blocks = blocks
+		this.running = -1;
 	 }
 	 clone()
 	 {
-		 var state1 = [], state2 = [];
-		 if(this.state1)
-			 for(var i = 0; i < this.state1.length; i++) state1.push(this.state1[i].clone());
-		 if(this.state2)
-			 for(var i = 0; i < this.state2.length; i++) state2.push(this.state2[i].clone());
-		 return new If(this.condition.clone(), state1, state2, this.loc);
+		var newblock = [];
+		for(var i = 0; i < this.blocks.length; i++)
+		{
+			var newblock1 = [];
+			for(var j = 0; j < this.blocks[i][1].length; j++) newblock1.push(this.blocks[i][1][j].clone());
+			newblock.push([this.blocks[i][0] ? this.blocks[i][0].clone() : null, newblock1]);
+		}
+		return new If(newblock,this.loc);
 	 }
 	 run()
 	 {
-		 if(this.state == 0)
-		 {
-			 code[0].stack.unshift({statementlist: [this.condition], index: 0});
-			 this.state = 1;
-		 }
-		 else
-		 {
-			 code[0].stack[0].index++;
-			 if(this.condition.getValue() instanceof BooleanValue)
-			 {
-				 if(this.condition.getValue().value) code[0].stack.unshift({statementlist: this.state1, index: 0});
-				 else if(this.state2 && this.state2.length > 0) code[0].stack.unshift({statementlist: this.state2, index: 0});
-			 }
-			 else throw new RuntimeError(this.first_line, "もし〜の構文で条件式が使われていません");
-			 this.state = 0;
-		 }
+		if(this.state == 0)
+		{
+			this.running = 0;
+			this.state = 1;
+		}
+		else if(this.state == 1)
+		{
+			if(this.running < this.blocks.length)
+			{
+				if(this.blocks[this.running][0]) code[0].stack.unshift({statementlist: [this.blocks[this.running][0]], index: 0});
+				this.state = 2;
+			}
+			else
+			{
+				this.state = 0;
+				code[0].stack[0].index++;
+			}
+		}
+		else if(this.state == 2)
+		{
+			var flag = this.blocks[this.running][0] ? this.blocks[this.running][0].getValue() : new BooleanValue(true, this.loc);
+			if(flag instanceof BooleanValue)
+			{
+				if(flag.value)
+				{
+					code[0].stack[0].index++;
+					this.state = 0;
+					code[0].stack.unshift({statementlist: this.blocks[this.running][1], index: 0});
+				}
+				else
+				{
+					this.running++;
+					this.state = 1;
+				}
+			}
+			else throw new RuntimeError(this.first_line, "条件式が使われるべき場所なのに，条件式が使われていません");
+		}
 	 }
 }
  
@@ -4539,8 +4563,8 @@ function run()
 		{
 			if(selected_quiz < 0)
 			{
-				if(e.line) textareaAppend(e.line + "行目");
-				textareaAppend("構文エラーです\n" + e.message + "\n");
+				if(e.line && e.line > 0) textareaAppend(e.line + "行目構文エラーです\n");
+				textareaAppend(e.message + "\n");
 				reset(false);
 				return;
 			}
@@ -5021,13 +5045,20 @@ class Flowchart
 				var p1 = new Parts_If();
 				var b1 = new Parts_Bar(), b2 = new Parts_Bar(), b3 = new Parts_Bar();
 				var n1 = new Parts_Null(), n2 = new Parts_Null(), n3 = new Parts_Null();
-				p1.setValue(p.condition.getCode());
+				p1.setValue(p.blocks[0][0].getCode());
 				parts.next = p1; 
 				p1.next = n1; n1.next = b1;
 				p1.left = b2; b2._prev = p1; b2.next = n2;
 				p1.right = b3; b3._prev = p1; b3.next = n3;
-				if(p.state1) Flowchart.appendParts(b2, p.state1);
-				if(p.state2) Flowchart.appendParts(b3, p.state2);
+				if(p.blocks[0][1]) Flowchart.appendParts(b2, p.blocks[0][1]);
+				if(p.blocks.length > 1)
+				{
+					if(p.blocks.length == 2 && !p.blocks[1][0])
+					{
+						if(p.blocks[1][1]) Flowchart.appendParts(b3, p.blocks[1][1]);
+					}
+					else throw new RuntimeError(-1, "「そうでなくもし」はフローチャートで表せません。");
+				}
 				parts = b1;
 			}
 			else if(statement == "ForInc")
