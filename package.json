@@ -14,7 +14,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "uglifyjs run.js -o run.min.js",
-    "jison": "jison dncl.jison; patch < dncl.patch; uglifyjs dncl.js -o dncl.min.js"
+    "jison": "jison dncl.jison && patch < dncl.patch && uglifyjs dncl.js -o dncl.min.js"
   },
   "repository": {
     "type": "git",

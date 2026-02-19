@@ -51,7 +51,7 @@ AssignAdd		[\+＋][\=＝←]
 AssignDel		[\-ー−‐][\=＝←]
 AssignMul		[\*＊×][\=＝←]
 AssignDiv		[/／][\=＝←]
-AssignDiv2		"÷"[\=＝←]
+AssignDivInt	"÷"[\=＝←]
 AssignMod		[%％][\=＝←]
 AssignAnd		[&＆][\=＝←]
 AssignOr		[\|｜][\=＝←]
@@ -63,7 +63,7 @@ Del				[\-ー−‐]
 Pow				[\*＊×][\*＊×]
 Mul				[\*＊×]
 Div				[/／]
-Div2			"÷"
+DivInt			"÷"
 Mod				[%％]
 BitAnd			[&＆]
 BitOr			[\|｜]
@@ -124,7 +124,7 @@ Whitespace		[\s\t 　│]	// 罫線の縦棒
 {Pow}			{return '**';}
 {Mul}			{return '*';}
 {Div}			{return '/';}
-{Div2}			{return '÷';}
+{DivInt}		{return '÷';}
 {Mod}			{return '%';}
 {BitAnd}		{return '&';}
 {BitOr}			{return '|';}
@@ -147,7 +147,7 @@ Whitespace		[\s\t 　│]	// 罫線の縦棒
 {AssignDel}		{return '-=';}
 {AssignMul}		{return '*=';}
 {AssignDiv}		{return '/=';}
-{AssignDiv2}	{return '÷=';}
+{AssignDivInt}	{return '÷=';}
 {AssignMod}		{return '%=';}
 {AssignAnd}		{return '&=';}
 {AssignOr}		{return '|=';}
@@ -308,7 +308,7 @@ e
 	| e '-' e		{$$ = new Sub($1, $3, new Location(@1, @3));}
 	| e '*' e		{$$ = new Mul($1, $3, new Location(@1, @3));}
 	| e '/' e		{$$ = new Div($1, $3, new Location(@1, @3));}
-	| e '÷' e		{$$ = new Div2($1, $3, new Location(@1, @3));}
+	| e '÷' e		{$$ = new DivInt($1, $3, new Location(@1, @3));}
 	| e '%' e		{$$ = new Mod($1, $3, new Location(@1, @3));}
 	| '-' e			%prec UMINUS { $$ = new Minus($2, new Location(@2, @2));}
 	| e '&' e		{$$ = new BitAnd($1, $3, new Location(@1, @3));}

@@ -1136,7 +1136,7 @@ class Div extends Value	// /
 	}
 }
 
-class Div2 extends Value // ÷
+class DivInt extends Value // ÷
 {
 	constructor(x, y, loc)
 	{
@@ -4406,7 +4406,7 @@ class While extends Statement
 		super(loc);
 		this.condition = condition;
 		this.statementlist = statementlist;
-		this.state = 0;
+		// this.status = 0;
 	}
 	clone()
 	{

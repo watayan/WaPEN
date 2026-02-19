@@ -114,7 +114,7 @@ case 10:
 this.$ = new Div($$[$0-2], $$[$0], new Location(_$[$0-2], _$[$0]));
 break;
 case 11:
-this.$ = new Div2($$[$0-2], $$[$0], new Location(_$[$0-2], _$[$0]));
+this.$ = new DivInt($$[$0-2], $$[$0], new Location(_$[$0-2], _$[$0]));
 break;
 case 12:
 this.$ = new Mod($$[$0-2], $$[$0], new Location(_$[$0-2], _$[$0]));
